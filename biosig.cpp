@@ -4,25 +4,25 @@
 #include <functional>
 #include <chrono>
 
-// DEFAULTS ---------------------
+// DEFAULTS -----------------------
 static uint KMER_LEN = 5;
-static uint SIGNATURE_LEN = 1024;
+static uint SIGNATURE_WIDTH = 1024;
 static uint SIGNATURE_DENSITY = 19;
-// ------------------------------
+// --------------------------------
 
 using namespace std;
 
 vector<int> hashKmer(string kmer) {
     srand(hash<string>{}(kmer));
 
-    vector<int> kmerHash(SIGNATURE_LEN);
+    vector<int> kmerHash(SIGNATURE_WIDTH);
 
     uint pos = 0;
-    uint set_limit = SIGNATURE_LEN / SIGNATURE_DENSITY / 2;
+    uint set_limit = SIGNATURE_WIDTH / SIGNATURE_DENSITY / 2;
 
     // Fill half with 1
     for (uint set = 0; set < set_limit;) {
-        pos = rand() % SIGNATURE_LEN;
+        pos = rand() % SIGNATURE_WIDTH;
 
         if (!kmerHash[pos]) {
             kmerHash[pos] = 1;
@@ -32,7 +32,7 @@ vector<int> hashKmer(string kmer) {
 
     // Fill other half with -1
     for (uint set = 0; set < set_limit;) {
-        pos = rand() % SIGNATURE_LEN;
+        pos = rand() % SIGNATURE_WIDTH;
 
         if (!kmerHash[pos]) {
             kmerHash[pos] = -1;
@@ -52,7 +52,7 @@ void generateSignature(string filename) {
         return;
     }
 
-    vector<int> signature(SIGNATURE_LEN);
+    vector<int> signature(SIGNATURE_WIDTH);
 
     string kmerBuffer[KMER_LEN];
     uint maxBufferIndex = 1;
@@ -70,7 +70,7 @@ void generateSignature(string filename) {
                 if (kmerBuffer[i].length() == KMER_LEN) {
                     vector<int> kmerHash = hashKmer(kmerBuffer[i]);
 
-                    for (uint i = 0; i < SIGNATURE_LEN; i++) {
+                    for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
                         signature[i] += kmerHash[i];
                     }
                     
@@ -84,7 +84,7 @@ void generateSignature(string filename) {
 
     // Output flattened signature
     uint popcount = 0;
-    for (uint i = 0; i < SIGNATURE_LEN; i++) {
+    for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
         uint bit = (signature[i] > 0 ? 1 : 0);
         popcount += bit;
         cout << bit;
@@ -102,10 +102,38 @@ int main(int argc, char * argv[]) {
         return 1;
     }
 
+    // Argument parsing
+    for (int i = 1; i < argc; i++) {
+        string arg = string(argv[i]);
+
+        if (arg[0] == '-') {
+            // Configuration
+            string setting = arg.substr(1, arg.length());
+
+            if (setting == "kmerlen") {
+                KMER_LEN = stoi(argv[++i]);
+                continue;
+            }
+
+            if (setting == "sigwidth") {
+                SIGNATURE_WIDTH = stoi(argv[++i]);
+                cerr << SIGNATURE_WIDTH << endl;
+                continue;
+            }
+
+            if (setting == "sigdensity") {
+                SIGNATURE_DENSITY = stoi(argv[++i]);
+                continue;
+            }
+        } else {
+            // Input file/directory
+            generateSignature(arg);
+        }
+    }
+
     cerr << "Generating signature...";
     chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
 
-    generateSignature(argv[1]);
 
     chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
     chrono::duration<double> time_span = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
