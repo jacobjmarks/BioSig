@@ -4,9 +4,9 @@
 #include <functional>
 
 // DEFAULTS ---------------------
-static int KMER_LEN = 5;
-static int SIGNATURE_LEN = 1024;
-static int SIGNATURE_DENSITY = 1;
+static uint KMER_LEN = 5;
+static uint SIGNATURE_LEN = 1024;
+static uint SIGNATURE_DENSITY = 1;
 // ------------------------------
 
 using namespace std;
@@ -16,11 +16,11 @@ vector<int> hashKmer(string kmer) {
 
     vector<int> kmerHash(SIGNATURE_LEN);
 
-    int pos = 0;
-    int set_limit = (SIGNATURE_LEN * SIGNATURE_DENSITY) / 2;
+    uint pos = 0;
+    uint set_limit = (SIGNATURE_LEN * SIGNATURE_DENSITY) / 2;
 
     // Fill half with 1
-    for (int set = 0; set < set_limit;) {
+    for (uint set = 0; set < set_limit;) {
         pos = rand() % SIGNATURE_LEN;
 
         if (!kmerHash[pos]) {
@@ -30,7 +30,7 @@ vector<int> hashKmer(string kmer) {
     }
 
     // Fill other half with -1
-    for (int set = 0; set < set_limit;) {
+    for (uint set = 0; set < set_limit;) {
         pos = rand() % SIGNATURE_LEN;
 
         if (!kmerHash[pos]) {
@@ -54,7 +54,7 @@ void generateSignature(string filename) {
     vector<int> signature(SIGNATURE_LEN);
 
     string kmerBuffer[KMER_LEN];
-    int maxBufferIndex = 1;
+    uint maxBufferIndex = 1;
 
     char ch;
     while((ch = file.get()) != EOF) {
@@ -63,13 +63,13 @@ void generateSignature(string filename) {
         } else if (ch == '\n' || ch == '\r') {
             // Skip
         } else {
-            for (int i = 0; i < maxBufferIndex; i++) {
+            for (uint i = 0; i < maxBufferIndex; i++) {
                 kmerBuffer[i] += ch;
 
                 if (kmerBuffer[i].length() == KMER_LEN) {
                     vector<int> kmerHash = hashKmer(kmerBuffer[i]);
 
-                    for (int i = 0; i < SIGNATURE_LEN; i++) {
+                    for (uint i = 0; i < SIGNATURE_LEN; i++) {
                         signature[i] += kmerHash[i];
                     }
                     
@@ -82,9 +82,9 @@ void generateSignature(string filename) {
     }
 
     // Output flattened signature
-    int popcount = 0;
-    for (int i = 0; i < SIGNATURE_LEN; i++) {
-        int bit = (signature[i] > 0 ? 1 : 0);
+    uint popcount = 0;
+    for (uint i = 0; i < SIGNATURE_LEN; i++) {
+        uint bit = (signature[i] > 0 ? 1 : 0);
         popcount += bit;
         cout << bit;
     }
