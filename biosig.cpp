@@ -6,7 +6,7 @@
 // DEFAULTS ---------------------
 static uint KMER_LEN = 5;
 static uint SIGNATURE_LEN = 1024;
-static uint SIGNATURE_DENSITY = 1;
+static uint SIGNATURE_DENSITY = 19;
 // ------------------------------
 
 using namespace std;
@@ -17,7 +17,7 @@ vector<int> hashKmer(string kmer) {
     vector<int> kmerHash(SIGNATURE_LEN);
 
     uint pos = 0;
-    uint set_limit = (SIGNATURE_LEN * SIGNATURE_DENSITY) / 2;
+    uint set_limit = SIGNATURE_LEN / SIGNATURE_DENSITY / 2;
 
     // Fill half with 1
     for (uint set = 0; set < set_limit;) {
