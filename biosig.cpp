@@ -102,6 +102,8 @@ int main(int argc, char * argv[]) {
         return 1;
     }
 
+    vector<string> inputFiles;
+
     // Argument parsing
     for (int i = 1; i < argc; i++) {
         string arg = string(argv[i]);
@@ -126,18 +128,22 @@ int main(int argc, char * argv[]) {
                 continue;
             }
         } else {
-            // Input file/directory
-            generateSignature(arg);
+            // Input file
+            inputFiles.push_back(arg);
         }
     }
 
-    cerr << "Generating signature...";
-    chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
+    for (string file : inputFiles) {
+        cerr << file << endl;
+        cerr << "\tIndexing...";
+        chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
 
+        generateSignature(file);
 
-    chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
-    chrono::duration<double> time_span = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
-    cerr << time_span.count() << 's' << endl;
+        chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
+        chrono::duration<double> time_span = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
+        cerr << time_span.count() << 's' << endl;
+    }
 
     return 0;
 }
