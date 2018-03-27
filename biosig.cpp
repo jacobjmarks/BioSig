@@ -2,6 +2,7 @@
 #include <fstream>
 #include <vector>
 #include <functional>
+#include <chrono>
 
 // DEFAULTS ---------------------
 static uint KMER_LEN = 5;
@@ -101,7 +102,14 @@ int main(int argc, char * argv[]) {
         return 1;
     }
 
+    cerr << "Generating signature...";
+    chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
+
     generateSignature(argv[1]);
+
+    chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
+    chrono::duration<double> time_span = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
+    cerr << time_span.count() << 's' << endl;
 
     return 0;
 }
