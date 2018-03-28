@@ -19,10 +19,14 @@ enum Use {
 string Usage(Use use) {
     switch(use) {
         case GENERAL:
+            return
+            "Usage: ./biosig [OPTION]\n"
+            "OPTION\n"
+            "    index     Generates a signature file from the given sequence files.\n"
+            "    search    Searches the documents in a given signature file.\n";
         case INDEX:
             return
             "Usage: ./biosig index [OPTIONS] inputfile1 [inputfile2 [...]] > outputfile.bsig\n"
-            ""
             "OPTIONS\n"
             "    -kmerlen       Kmer length to hash.\n"
             "                   DEFAULT: 5\n"
@@ -123,56 +127,79 @@ void ReadDirectory(string directory) {
 
 int main(int argc, char * argv[]) {
     if (argc < 2) {
-        cout << "Please specify input file(s)." << endl;
+        cerr << Usage(GENERAL) << endl;
         return 1;
     }
 
-    vector<string> input_files;
+    string use = argv[1];
 
-    // Argument parsing
-    for (int i = 1; i < argc; i++) {
-        string arg = string(argv[i]);
-
-        if (arg[0] == '-') {
-            // Configuration
-            string setting = arg.substr(1, arg.length());
-
-            if (setting == "kmerlen") {
-                KMER_LEN = stoi(argv[++i]);
-                continue;
-            }
-
-            if (setting == "sigwidth") {
-                SIGNATURE_WIDTH = stoi(argv[++i]);
-                cerr << SIGNATURE_WIDTH << endl;
-                continue;
-            }
-
-            if (setting == "sigdensity") {
-                SIGNATURE_DENSITY = stoi(argv[++i]);
-                continue;
-            }
-            
-            cerr << "Unknown param: -" << setting << endl;
+    if (use == "index") {
+        if (argc < 3) {
             cerr << Usage(INDEX) << endl;
             return 1;
-        } else {
-            // Input file
-            input_files.push_back(arg);
         }
+
+        vector<string> input_files;
+
+        // Argument parsing
+        for (int i = 2; i < argc; i++) {
+            string arg = string(argv[i]);
+
+            if (arg[0] == '-') {
+                // Configuration
+                string setting = arg.substr(1, arg.length());
+
+                if (setting == "kmerlen") {
+                    KMER_LEN = stoi(argv[++i]);
+                    continue;
+                }
+
+                if (setting == "sigwidth") {
+                    SIGNATURE_WIDTH = stoi(argv[++i]);
+                    cerr << SIGNATURE_WIDTH << endl;
+                    continue;
+                }
+
+                if (setting == "sigdensity") {
+                    SIGNATURE_DENSITY = stoi(argv[++i]);
+                    continue;
+                }
+                
+                cerr << "Unknown param: -" << setting << endl;
+                cerr << Usage(INDEX) << endl;
+                return 1;
+            } else {
+                // Input file
+                input_files.push_back(arg);
+            }
+        }
+
+        if (!input_files.size()) {
+            cerr << "Please specify input file(s)." << endl;
+            cerr << Usage(INDEX) << endl;
+            return 1;
+        }
+
+        for (string file : input_files) {
+            cerr << file << endl;
+            cerr << "\tIndexing...";
+            chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
+
+            GenerateSignature(file);
+
+            chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
+            chrono::duration<double> time_span = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
+            cerr << time_span.count() << 's' << endl;
+        }
+
+        return 0;
     }
 
-    for (string file : input_files) {
-        cerr << file << endl;
-        cerr << "\tIndexing...";
-        chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
-
-        GenerateSignature(file);
-
-        chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
-        chrono::duration<double> time_span = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
-        cerr << time_span.count() << 's' << endl;
+    if (use == "search") {
+        cerr << "NOT IMPLEMENTED" << endl;
+        return 0;
     }
 
-    return 0;
+    cerr << Usage(GENERAL) << endl;
+    return 1;
 }
