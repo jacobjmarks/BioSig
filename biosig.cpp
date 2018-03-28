@@ -12,12 +12,12 @@ static uint SIGNATURE_DENSITY = 19;
 
 using namespace std;
 
-enum Usage {
+enum Use {
     GENERAL, INDEX, SEARCH
 };
 
-string usage(Usage section) {
-    switch(section) {
+string Usage(Use use) {
+    switch(use) {
         case GENERAL:
         case INDEX:
             return
@@ -37,10 +37,10 @@ string usage(Usage section) {
     }
 }
 
-vector<int> hashKmer(string kmer) {
+vector<int> HashKmer(string kmer) {
     srand(hash<string>{}(kmer));
 
-    vector<int> kmerHash(SIGNATURE_WIDTH);
+    vector<int> kmer_hash(SIGNATURE_WIDTH);
 
     uint pos = 0;
     uint set_limit = SIGNATURE_WIDTH / SIGNATURE_DENSITY / 2;
@@ -49,8 +49,8 @@ vector<int> hashKmer(string kmer) {
     for (uint set = 0; set < set_limit;) {
         pos = rand() % SIGNATURE_WIDTH;
 
-        if (!kmerHash[pos]) {
-            kmerHash[pos] = 1;
+        if (!kmer_hash[pos]) {
+            kmer_hash[pos] = 1;
             set++;
         }
     }
@@ -59,28 +59,28 @@ vector<int> hashKmer(string kmer) {
     for (uint set = 0; set < set_limit;) {
         pos = rand() % SIGNATURE_WIDTH;
 
-        if (!kmerHash[pos]) {
-            kmerHash[pos] = -1;
+        if (!kmer_hash[pos]) {
+            kmer_hash[pos] = -1;
             set++;
         }
     }
 
-    return kmerHash;
+    return kmer_hash;
 }
 
-void generateSignature(string filename) {
+void GenerateSignature(string filename) {
     ifstream file;
     file.open(filename);
 
     if(!file.is_open()) {
-        cout << "Error opening file: " << filename << endl;
+        cerr << "Error opening file" << endl;
         return;
     }
 
     vector<int> signature(SIGNATURE_WIDTH);
 
-    string kmerBuffer[KMER_LEN];
-    uint maxBufferIndex = 1;
+    string kmer_buffer[KMER_LEN];
+    uint max_buffer_index = 1;
 
     char ch;
     while((ch = file.get()) != EOF) {
@@ -89,21 +89,21 @@ void generateSignature(string filename) {
         } else if (ch == '\n' || ch == '\r') {
             // Skip
         } else {
-            for (uint i = 0; i < maxBufferIndex; i++) {
-                kmerBuffer[i] += ch;
+            for (uint i = 0; i < max_buffer_index; i++) {
+                kmer_buffer[i] += ch;
 
-                if (kmerBuffer[i].length() == KMER_LEN) {
-                    vector<int> kmerHash = hashKmer(kmerBuffer[i]);
+                if (kmer_buffer[i].length() == KMER_LEN) {
+                    vector<int> kmer_hash = HashKmer(kmer_buffer[i]);
 
                     for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
-                        signature[i] += kmerHash[i];
+                        signature[i] += kmer_hash[i];
                     }
                     
-                    kmerBuffer[i].clear();
+                    kmer_buffer[i].clear();
                 }
             }
 
-            if (maxBufferIndex < KMER_LEN) maxBufferIndex++;
+            if (max_buffer_index < KMER_LEN) max_buffer_index++;
         }
     }
 
@@ -117,17 +117,17 @@ void generateSignature(string filename) {
     cout << endl;
 }
 
-void readDirectory(string directory) {
+void ReadDirectory(string directory) {
 
 }
 
 int main(int argc, char * argv[]) {
     if (argc < 2) {
-        cout << "Please specify filename." << endl;
+        cout << "Please specify input file(s)." << endl;
         return 1;
     }
 
-    vector<string> inputFiles;
+    vector<string> input_files;
 
     // Argument parsing
     for (int i = 1; i < argc; i++) {
@@ -154,20 +154,20 @@ int main(int argc, char * argv[]) {
             }
             
             cerr << "Unknown param: -" << setting << endl;
-            cerr << usage(INDEX) << endl;
+            cerr << Usage(INDEX) << endl;
             return 1;
         } else {
             // Input file
-            inputFiles.push_back(arg);
+            input_files.push_back(arg);
         }
     }
 
-    for (string file : inputFiles) {
+    for (string file : input_files) {
         cerr << file << endl;
         cerr << "\tIndexing...";
         chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
 
-        generateSignature(file);
+        GenerateSignature(file);
 
         chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
         chrono::duration<double> time_span = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
