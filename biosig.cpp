@@ -12,6 +12,31 @@ static uint SIGNATURE_DENSITY = 19;
 
 using namespace std;
 
+enum Usage {
+    GENERAL, INDEX, SEARCH
+};
+
+string usage(Usage section) {
+    switch(section) {
+        case GENERAL:
+        case INDEX:
+            return
+            "Usage: ./biosig index [OPTIONS] inputfile1 [inputfile2 [...]] > outputfile.bsig\n"
+            ""
+            "OPTIONS\n"
+            "    -kmerlen       Kmer length to hash.\n"
+            "                   DEFAULT: 5\n"
+            "    -sigwidth      Signature size in bits.\n"
+            "                   DEFAULT: 1024\n"
+            "    -sigdensity    Signature density (1/x).\n"
+            "                   DEFAULT: 19\n";
+        case SEARCH:
+        default:
+            return NULL;
+            break;
+    }
+}
+
 vector<int> hashKmer(string kmer) {
     srand(hash<string>{}(kmer));
 
@@ -127,6 +152,10 @@ int main(int argc, char * argv[]) {
                 SIGNATURE_DENSITY = stoi(argv[++i]);
                 continue;
             }
+            
+            cerr << "Unknown param: -" << setting << endl;
+            cerr << usage(INDEX) << endl;
+            return 1;
         } else {
             // Input file
             inputFiles.push_back(arg);
