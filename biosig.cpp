@@ -182,6 +182,9 @@ int main(int argc, char * argv[]) {
             return 1;
         }
 
+        // Initial config metadata
+        cout << KMER_LEN << ',' << SIGNATURE_WIDTH << ',' << SIGNATURE_DENSITY << endl;
+
         for (string file : input_files) {
             cerr << file << endl;
             cerr << "\tIndexing...";
