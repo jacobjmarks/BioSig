@@ -81,6 +81,8 @@ void GenerateSignature(string filename) {
         return;
     }
 
+    cout << '>' << filename.substr(filename.find_last_of('/') + 1, filename.length()) << endl;
+
     vector<int> signature(SIGNATURE_WIDTH);
 
     string kmer_buffer[KMER_LEN];
