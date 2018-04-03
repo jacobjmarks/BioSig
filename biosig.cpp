@@ -11,6 +11,7 @@ static uint SIGNATURE_DENSITY = 19;
 // --------------------------------
 
 using namespace std;
+using namespace chrono;
 
 enum Use {
     GENERAL, INDEX, SEARCH
@@ -136,6 +137,7 @@ int main(int argc, char * argv[]) {
 
     string use = argv[1];
 
+    // INDEX --------------------------------------------------------------------------------------
     if (use == "index") {
         if (argc < 3) {
             cerr << Usage(INDEX) << endl;
@@ -189,7 +191,7 @@ int main(int argc, char * argv[]) {
         for (string file : input_files) {
             cerr << file << endl;
             cerr << "\tIndexing...";
-            chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
+            high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
             cout << '>' << file.substr(file.find_last_of('/') + 1, file.length()) << endl;
 
@@ -200,14 +202,16 @@ int main(int argc, char * argv[]) {
             }
             cout << endl;
 
-            chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
-            chrono::duration<double> time_span = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
+            high_resolution_clock::time_point t2 = high_resolution_clock::now();
+            duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
             cerr << time_span.count() << 's' << endl;
         }
 
         return 0;
     }
+    // --------------------------------------------------------------------------------------------
 
+    // SEARCH -------------------------------------------------------------------------------------
     if (use == "search") {
         if (argc < 4) {
             cerr << "Please specify target signature file and query sequence file(s)." << endl;
@@ -290,6 +294,7 @@ int main(int argc, char * argv[]) {
         signature_file.close();
         return 0;
     }
+    // --------------------------------------------------------------------------------------------
 
     cerr << Usage(GENERAL) << endl;
     return 1;
