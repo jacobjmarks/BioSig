@@ -263,9 +263,12 @@ int main(int argc, char * argv[]) {
         for (string query_file : query_files) {
             string query_signature = GenerateSignature(query_file);
 
+            cout << query_file << endl;
+
             while (getline(signature_file, line)) {
                 if (line[0] == '>') {
                     // Metadata
+                    cout << '\t' << line.substr(1, line.length()) << '\t';
                 } else {
                     // Signature
                     uint hamming_dist = 0;
@@ -275,7 +278,8 @@ int main(int argc, char * argv[]) {
                             hamming_dist++;
                         }
                     }
-                    cout << hamming_dist << endl;
+
+                    cout << abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH << endl;
                 }
             }
 
