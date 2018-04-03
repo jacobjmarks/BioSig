@@ -35,6 +35,8 @@ string Usage(Use use) {
             "    -sigdensity    Signature density (1/x).\n"
             "                   DEFAULT: 19\n";
         case SEARCH:
+            return
+            "Usage: ./biosig search sigfile.bsig queryFile1 [queryFile2 [...]] > results.txt";
         default:
             return NULL;
             break;
@@ -81,8 +83,6 @@ string GenerateSignature(string filename) {
         __throw_runtime_error(("Error opening file: " + filename).c_str());
     }
 
-    cout << '>' << filename.substr(filename.find_last_of('/') + 1, filename.length()) << endl;
-
     vector<int> signature(SIGNATURE_WIDTH);
 
     string kmer_buffer[KMER_LEN];
@@ -112,6 +112,8 @@ string GenerateSignature(string filename) {
             if (max_buffer_index < KMER_LEN) max_buffer_index++;
         }
     }
+
+    file.close();
 
     // Flatten and return
     string flatsig;
@@ -189,6 +191,8 @@ int main(int argc, char * argv[]) {
             cerr << "\tIndexing...";
             chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
 
+            cout << '>' << file.substr(file.find_last_of('/') + 1, file.length()) << endl;
+
             string signature = GenerateSignature(file);
 
             for (char bit : signature) {
@@ -205,7 +209,81 @@ int main(int argc, char * argv[]) {
     }
 
     if (use == "search") {
-        cerr << "NOT IMPLEMENTED" << endl;
+        if (argc < 4) {
+            cerr << "Please specify target signature file and query sequence file(s)." << endl;
+            cerr << Usage(SEARCH) << endl;
+            return 1;
+        }
+
+        string signature_filepath;
+        vector<string> query_files;
+
+        // Argument parsing
+        for (int i = 2; i < argc; i++) {
+            string arg = string(argv[i]);
+
+            if (arg[0] == '-') {
+                // Configuration
+                string setting = arg.substr(1, arg.length());                
+                cerr << "Unknown param: -" << setting << endl;
+                cerr << Usage(SEARCH) << endl;
+                return 1;
+            } else {
+                if (signature_filepath.empty()) {
+                    signature_filepath = arg;
+                } else {
+                    query_files.push_back(arg);
+                }
+            }
+        }
+
+        ifstream signature_file;
+        signature_file.open(signature_filepath);
+
+        if (!signature_file.is_open()) {
+            cerr << "Error opening signature file: " << signature_filepath << endl;
+            cerr << Usage(SEARCH) << endl;
+            return 1;
+        }
+
+        string line;
+
+        // Read and match signature generation metadata
+        getline(signature_file, line, ',');
+        KMER_LEN = stoi(line);
+
+        getline(signature_file, line, ',');
+        SIGNATURE_WIDTH = stoi(line);
+
+        getline(signature_file, line);
+        SIGNATURE_DENSITY = stoi(line);
+
+        streampos start = signature_file.tellg();
+
+        for (string query_file : query_files) {
+            string query_signature = GenerateSignature(query_file);
+
+            while (getline(signature_file, line)) {
+                if (line[0] == '>') {
+                    // Metadata
+                } else {
+                    // Signature
+                    uint hamming_dist = 0;
+
+                    for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
+                        if (query_signature[i] != line[i]) {
+                            hamming_dist++;
+                        }
+                    }
+                    cout << hamming_dist << endl;
+                }
+            }
+
+            signature_file.clear();
+            signature_file.seekg(start);
+        }
+
+        signature_file.close();
         return 0;
     }
 
