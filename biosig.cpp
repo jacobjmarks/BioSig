@@ -72,13 +72,13 @@ vector<int> HashKmer(string kmer) {
     return kmer_hash;
 }
 
-void GenerateSignature(string filename) {
+string GenerateSignature(string filename) {
     ifstream file;
     file.open(filename);
 
     if(!file.is_open()) {
-        cerr << "Error opening file" << endl;
-        return;
+        cerr << endl;
+        __throw_runtime_error(("Error opening file: " + filename).c_str());
     }
 
     cout << '>' << filename.substr(filename.find_last_of('/') + 1, filename.length()) << endl;
@@ -113,14 +113,13 @@ void GenerateSignature(string filename) {
         }
     }
 
-    // Output flattened signature
-    uint popcount = 0;
+    // Flatten and return
+    string flatsig;
     for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
-        uint bit = (signature[i] > 0 ? 1 : 0);
-        popcount += bit;
-        cout << bit;
+        flatsig += (signature[i] > 0 ? '1' : '0');
     }
-    cout << endl;
+
+    return flatsig;
 }
 
 void ReadDirectory(string directory) {
@@ -190,7 +189,12 @@ int main(int argc, char * argv[]) {
             cerr << "\tIndexing...";
             chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
 
-            GenerateSignature(file);
+            string signature = GenerateSignature(file);
+
+            for (char bit : signature) {
+                cout << bit;
+            }
+            cout << endl;
 
             chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
             chrono::duration<double> time_span = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
