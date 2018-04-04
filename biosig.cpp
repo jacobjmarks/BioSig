@@ -13,6 +13,8 @@ static uint SIGNATURE_DENSITY = 19;
 using namespace std;
 using namespace chrono;
 
+ofstream OUTFILE;
+
 enum Use {
     GENERAL, INDEX, SEARCH
 };
@@ -27,7 +29,7 @@ string Usage(Use use) {
             "    search    Searches the documents in a given signature file.\n";
         case INDEX:
             return
-            "Usage: ./biosig index [OPTIONS] inputfile1 [inputfile2 [...]] > outputfile.bsig\n"
+            "Usage: ./biosig index [OPTIONS] inputfile1 [inputfile2 [...]] -o outfile.bsig\n"
             "OPTIONS\n"
             "    -kmerlen       Kmer length to hash.\n"
             "                   DEFAULT: 5\n"
@@ -37,7 +39,7 @@ string Usage(Use use) {
             "                   DEFAULT: 19\n";
         case SEARCH:
             return
-            "Usage: ./biosig search sigfile.bsig queryFile1 [queryFile2 [...]] > results.txt";
+            "Usage: ./biosig search sigfile.bsig queryFile1 [queryFile2 [...]] -o outfile.tsv";
         default:
             return NULL;
             break;
@@ -228,7 +230,18 @@ int main(int argc, char * argv[]) {
 
             if (arg[0] == '-') {
                 // Configuration
-                string setting = arg.substr(1, arg.length());                
+                string setting = arg.substr(1, arg.length());     
+
+                if (setting == "o") {
+                    OUTFILE.open(argv[++i]);
+                    if (!OUTFILE.is_open()) {
+                        cerr << "Cannot open file for writing: " << argv[i] << endl;
+                        cerr << Usage(SEARCH) << endl;
+                        return 1;
+                    }
+                    continue;
+                }
+
                 cerr << "Unknown param: -" << setting << endl;
                 cerr << Usage(SEARCH) << endl;
                 return 1;
@@ -239,6 +252,12 @@ int main(int argc, char * argv[]) {
                     query_files.push_back(arg);
                 }
             }
+        }
+
+        if (!OUTFILE.is_open()) {
+            cerr << "Please specifiy output file with '-o'" << endl;
+            cerr << Usage(SEARCH) << endl;
+            return 1;
         }
 
         ifstream signature_file;
@@ -267,12 +286,12 @@ int main(int argc, char * argv[]) {
         for (string query_file : query_files) {
             string query_signature = GenerateSignature(query_file);
 
-            cout << query_file << endl;
+            OUTFILE << query_file << endl;
 
             while (getline(signature_file, line)) {
                 if (line[0] == '>') {
                     // Metadata
-                    cout << '\t' << line.substr(1, line.length()) << '\t';
+                    OUTFILE << '\t' << line.substr(1, line.length()) << '\t';
                 } else {
                     // Signature
                     uint hamming_dist = 0;
@@ -283,7 +302,7 @@ int main(int argc, char * argv[]) {
                         }
                     }
 
-                    cout << abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH << endl;
+                    OUTFILE << abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH << endl;
                 }
             }
 
@@ -292,6 +311,7 @@ int main(int argc, char * argv[]) {
         }
 
         signature_file.close();
+        OUTFILE.close();
         return 0;
     }
     // --------------------------------------------------------------------------------------------
