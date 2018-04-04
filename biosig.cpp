@@ -283,15 +283,15 @@ int main(int argc, char * argv[]) {
 
         streampos start = signature_file.tellg();
 
-        for (string query_file : query_files) {
-            string query_signature = GenerateSignature(query_file);
+        vector<double> results[query_files.size()];
+        vector<string> signature_targets;
 
-            OUTFILE << query_file << endl;
+        for (uint i = 0; i < query_files.size(); i++) {
+            string query_signature = GenerateSignature(query_files[i]);
 
             while (getline(signature_file, line)) {
                 if (line[0] == '>') {
-                    // Metadata
-                    OUTFILE << '\t' << line.substr(1, line.length()) << '\t';
+                    if (i == 0) signature_targets.push_back(line.substr(1, line.length()));
                 } else {
                     // Signature
                     uint hamming_dist = 0;
@@ -302,7 +302,7 @@ int main(int argc, char * argv[]) {
                         }
                     }
 
-                    OUTFILE << abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH << endl;
+                    results[i].push_back(abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH);
                 }
             }
 
@@ -311,6 +311,24 @@ int main(int argc, char * argv[]) {
         }
 
         signature_file.close();
+
+        // Output result tsv
+        for (string query_file : query_files) {
+            OUTFILE << '\t' << query_file;
+        }
+
+        OUTFILE << endl;
+
+        for (uint i = 0; i < signature_targets.size(); i++) {
+            OUTFILE << signature_targets[i];
+
+            for (vector<double> result : results) {
+                OUTFILE << '\t' << to_string(result[i]);
+            }
+
+            OUTFILE << endl;
+        }
+
         OUTFILE.close();
         return 0;
     }
