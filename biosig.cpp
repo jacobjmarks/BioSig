@@ -141,7 +141,7 @@ int main(int argc, char * argv[]) {
 
     // INDEX --------------------------------------------------------------------------------------
     if (use == "index") {
-        if (argc < 3) {
+        if (argc < 5) {
             cerr << Usage(INDEX) << endl;
             return 1;
         }
@@ -171,6 +171,16 @@ int main(int argc, char * argv[]) {
                     SIGNATURE_DENSITY = stoi(argv[++i]);
                     continue;
                 }
+
+                if (setting == "o") {
+                    OUTFILE.open(argv[++i]);
+                    if (!OUTFILE.is_open()) {
+                        cerr << "Cannot open file for writing: " << argv[i] << endl;
+                        cerr << Usage(SEARCH) << endl;
+                        return 1;
+                    }
+                    continue;
+                }
                 
                 cerr << "Unknown param: -" << setting << endl;
                 cerr << Usage(INDEX) << endl;
@@ -187,22 +197,28 @@ int main(int argc, char * argv[]) {
             return 1;
         }
 
+        if (!OUTFILE.is_open()) {
+            cerr << "Please specifiy output file with '-o'" << endl;
+            cerr << Usage(SEARCH) << endl;
+            return 1;
+        }
+
         // Initial config metadata
-        cout << KMER_LEN << ',' << SIGNATURE_WIDTH << ',' << SIGNATURE_DENSITY << endl;
+        OUTFILE << KMER_LEN << ',' << SIGNATURE_WIDTH << ',' << SIGNATURE_DENSITY << endl;
 
         for (string file : input_files) {
             cerr << file << endl;
             cerr << "\tIndexing...";
             high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-            cout << '>' << file.substr(file.find_last_of('/') + 1, file.length()) << endl;
+            OUTFILE << '>' << file.substr(file.find_last_of('/') + 1, file.length()) << endl;
 
             string signature = GenerateSignature(file);
 
             for (char bit : signature) {
-                cout << bit;
+                OUTFILE << bit;
             }
-            cout << endl;
+            OUTFILE << endl;
 
             high_resolution_clock::time_point t2 = high_resolution_clock::now();
             duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
@@ -215,8 +231,7 @@ int main(int argc, char * argv[]) {
 
     // SEARCH -------------------------------------------------------------------------------------
     if (use == "search") {
-        if (argc < 4) {
-            cerr << "Please specify target signature file and query sequence file(s)." << endl;
+        if (argc < 6) {
             cerr << Usage(SEARCH) << endl;
             return 1;
         }
