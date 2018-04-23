@@ -3,6 +3,7 @@
 #include <vector>
 #include <functional>
 #include <chrono>
+#include <random>
 
 // DEFAULTS -----------------------
 static uint KMER_LEN = 5;
@@ -12,6 +13,8 @@ static uint SIGNATURE_DENSITY = 19;
 
 using namespace std;
 using namespace chrono;
+
+default_random_engine random_generator;
 
 ofstream OUTFILE;
 
@@ -47,7 +50,8 @@ string Usage(Use use) {
 }
 
 vector<int> HashKmer(string kmer) {
-    srand(hash<string>{}(kmer));
+    seed_seq seed(kmer.begin(), kmer.end());
+    random_generator.seed(seed);
 
     vector<int> kmer_hash(SIGNATURE_WIDTH);
 
@@ -56,7 +60,7 @@ vector<int> HashKmer(string kmer) {
 
     // Fill half with 1
     for (uint set = 0; set < set_limit;) {
-        pos = rand() % SIGNATURE_WIDTH;
+        pos = uniform_int_distribution<int>(0, SIGNATURE_WIDTH - 1)(random_generator);
 
         if (!kmer_hash[pos]) {
             kmer_hash[pos] = 1;
@@ -66,7 +70,7 @@ vector<int> HashKmer(string kmer) {
 
     // Fill other half with -1
     for (uint set = 0; set < set_limit;) {
-        pos = rand() % SIGNATURE_WIDTH;
+        pos = uniform_int_distribution<int>(0, SIGNATURE_WIDTH - 1)(random_generator);
 
         if (!kmer_hash[pos]) {
             kmer_hash[pos] = -1;
@@ -318,6 +322,7 @@ int main(int argc, char * argv[]) {
                     }
 
                     results[i].push_back(abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH);
+                    // results[i].push_back(hamming_dist);
                 }
             }
 
