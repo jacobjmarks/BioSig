@@ -4,17 +4,17 @@
 #include <functional>
 #include <chrono>
 #include <random>
+#include <omp.h>
 
 // DEFAULTS -----------------------
 static uint KMER_LEN = 5;
 static uint SIGNATURE_WIDTH = 1024;
 static uint SIGNATURE_DENSITY = 19;
 // --------------------------------
+static uint SIGNATURE_BYTE_COUNT = SIGNATURE_WIDTH / 8;
 
 using namespace std;
 using namespace chrono;
-
-default_random_engine random_generator;
 
 ofstream OUTFILE;
 
@@ -49,90 +49,57 @@ string Usage(Use use) {
     }
 }
 
-vector<int> HashKmer(string kmer) {
-    seed_seq seed(kmer.begin(), kmer.end());
-    random_generator.seed(seed);
-
-    vector<int> kmer_hash(SIGNATURE_WIDTH);
-
-    uint pos = 0;
-    uint set_limit = SIGNATURE_WIDTH / SIGNATURE_DENSITY / 2;
-
-    // Fill half with 1
-    for (uint set = 0; set < set_limit;) {
-        pos = uniform_int_distribution<int>(0, SIGNATURE_WIDTH - 1)(random_generator);
-
-        if (!kmer_hash[pos]) {
-            kmer_hash[pos] = 1;
-            set++;
-        }
-    }
-
-    // Fill other half with -1
-    for (uint set = 0; set < set_limit;) {
-        pos = uniform_int_distribution<int>(0, SIGNATURE_WIDTH - 1)(random_generator);
-
-        if (!kmer_hash[pos]) {
-            kmer_hash[pos] = -1;
-            set++;
-        }
-    }
-
-    return kmer_hash;
-}
-
-string GenerateSignature(string filename) {
-    ifstream file;
-    file.open(filename);
-
-    if(!file.is_open()) {
-        cerr << endl;
-        __throw_runtime_error(("Error opening file: " + filename).c_str());
-    }
+void GenerateSignature(string sequence, string seq_header) {
+    default_random_engine random_generator;
+    uniform_int_distribution<int> int_distribution(0, SIGNATURE_WIDTH - 1);
 
     vector<int> signature(SIGNATURE_WIDTH);
 
-    string kmer_buffer[KMER_LEN];
-    uint max_buffer_index = 1;
+    for (uint i = 0; i < sequence.length() - KMER_LEN + 1; i++) {
+        seed_seq seed(sequence.begin() + i, sequence.begin() + i + KMER_LEN);
+        random_generator.seed(seed);
 
-    char ch;
-    while((ch = file.get()) != EOF) {
-        if (ch == '>') {
-            while ((ch = file.get()) != '\n');
-        } else if (ch == '\n' || ch == '\r') {
-            // Skip
-        } else {
-            for (uint i = 0; i < max_buffer_index; i++) {
-                kmer_buffer[i] += ch;
+        uint pos = 0;
+        uint set_limit = SIGNATURE_WIDTH / SIGNATURE_DENSITY / 2;
+        vector<bool> bits_set(SIGNATURE_WIDTH, false);
 
-                if (kmer_buffer[i].length() == KMER_LEN) {
-                    vector<int> kmer_hash = HashKmer(kmer_buffer[i]);
+        for (uint set = 0; set < set_limit;) {
+            pos = int_distribution(random_generator);
 
-                    for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
-                        signature[i] += kmer_hash[i];
-                    }
-                    
-                    kmer_buffer[i].clear();
-                }
+            if (!bits_set[pos]) {
+                signature[pos] += 1;
+                bits_set[pos] = true;
+                set++;
             }
+        }
 
-            if (max_buffer_index < KMER_LEN) max_buffer_index++;
+        for (uint set = 0; set < set_limit;) {
+            pos = int_distribution(random_generator);
+
+            if (!bits_set[pos]) {
+                signature[pos] -= 1;
+                bits_set[pos] = true;
+                set++;
+            }
+        }
+    }
+    
+    char compressed_output[SIGNATURE_BYTE_COUNT];
+
+    uint index = 0;
+    for (uint i = 0; i < SIGNATURE_BYTE_COUNT; i++) {
+        for (int j = 7; j >= 0; j--) {
+            if (signature[index++] > 0) {
+                compressed_output[i] |= (1 << j);
+            }
         }
     }
 
-    file.close();
-
-    // Flatten and return
-    string flatsig;
-    for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
-        flatsig += (signature[i] > 0 ? '1' : '0');
+    #pragma omp critical(write_out)
+    {
+        OUTFILE << '>' << seq_header << endl;
+        OUTFILE << string(compressed_output) << endl;
     }
-
-    return flatsig;
-}
-
-void ReadDirectory(string directory) {
-
 }
 
 int main(int argc, char * argv[]) {
@@ -210,23 +177,50 @@ int main(int argc, char * argv[]) {
         // Initial config metadata
         OUTFILE << KMER_LEN << ',' << SIGNATURE_WIDTH << ',' << SIGNATURE_DENSITY << endl;
 
-        for (string file : input_files) {
-            cerr << file << endl;
-            cerr << "\tIndexing...";
-            high_resolution_clock::time_point t1 = high_resolution_clock::now();
+        #pragma omp parallel
+        {
+            #pragma omp single
+            {
+                for (string filepath : input_files) {
+                    cerr << filepath << endl;
+                    cerr << "\tIndexing...";
+                    high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-            OUTFILE << '>' << file.substr(file.find_last_of('/') + 1, file.length()) << endl;
+                    ifstream file;
+                    file.open(filepath);
 
-            string signature = GenerateSignature(file);
+                    string sequence;
+                    string seq_header;
 
-            for (char bit : signature) {
-                OUTFILE << bit;
+                    char ch;
+                    while((ch = file.get()) != EOF) {
+                        if (ch == '>') {
+                            if (!sequence.empty()) {
+                                #pragma omp task
+                                GenerateSignature(sequence, seq_header);
+                                sequence.clear();
+                                seq_header.clear();
+                            }
+                            while ((ch = file.get()) != '\n') seq_header += ch;
+                        } else if (ch == '\n' || ch == '\r') {
+                            // Skip
+                        } else {
+                            sequence += ch;
+                        }
+                    }
+
+                    if (!sequence.empty()) {
+                        #pragma omp task
+                        GenerateSignature(sequence, seq_header);
+                    }
+
+                    #pragma omp taskwait
+
+                    high_resolution_clock::time_point t2 = high_resolution_clock::now();
+                    duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
+                    cerr << time_span.count() << 's' << endl;
+                }
             }
-            OUTFILE << endl;
-
-            high_resolution_clock::time_point t2 = high_resolution_clock::now();
-            duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
-            cerr << time_span.count() << 's' << endl;
         }
 
         return 0;
@@ -234,124 +228,124 @@ int main(int argc, char * argv[]) {
     // --------------------------------------------------------------------------------------------
 
     // SEARCH -------------------------------------------------------------------------------------
-    if (use == "search") {
-        if (argc < 6) {
-            cerr << Usage(SEARCH) << endl;
-            return 1;
-        }
+    // if (use == "search") {
+    //     if (argc < 6) {
+    //         cerr << Usage(SEARCH) << endl;
+    //         return 1;
+    //     }
 
-        string signature_filepath;
-        vector<string> query_files;
+    //     string signature_filepath;
+    //     vector<string> query_files;
 
-        // Argument parsing
-        for (int i = 2; i < argc; i++) {
-            string arg = string(argv[i]);
+    //     // Argument parsing
+    //     for (int i = 2; i < argc; i++) {
+    //         string arg = string(argv[i]);
 
-            if (arg[0] == '-') {
-                // Configuration
-                string setting = arg.substr(1, arg.length());     
+    //         if (arg[0] == '-') {
+    //             // Configuration
+    //             string setting = arg.substr(1, arg.length());     
 
-                if (setting == "o") {
-                    OUTFILE.open(argv[++i]);
-                    if (!OUTFILE.is_open()) {
-                        cerr << "Cannot open file for writing: " << argv[i] << endl;
-                        cerr << Usage(SEARCH) << endl;
-                        return 1;
-                    }
-                    continue;
-                }
+    //             if (setting == "o") {
+    //                 OUTFILE.open(argv[++i]);
+    //                 if (!OUTFILE.is_open()) {
+    //                     cerr << "Cannot open file for writing: " << argv[i] << endl;
+    //                     cerr << Usage(SEARCH) << endl;
+    //                     return 1;
+    //                 }
+    //                 continue;
+    //             }
 
-                cerr << "Unknown param: -" << setting << endl;
-                cerr << Usage(SEARCH) << endl;
-                return 1;
-            } else {
-                if (signature_filepath.empty()) {
-                    signature_filepath = arg;
-                } else {
-                    query_files.push_back(arg);
-                }
-            }
-        }
+    //             cerr << "Unknown param: -" << setting << endl;
+    //             cerr << Usage(SEARCH) << endl;
+    //             return 1;
+    //         } else {
+    //             if (signature_filepath.empty()) {
+    //                 signature_filepath = arg;
+    //             } else {
+    //                 query_files.push_back(arg);
+    //             }
+    //         }
+    //     }
 
-        if (!OUTFILE.is_open()) {
-            cerr << "Please specifiy output file with '-o'" << endl;
-            cerr << Usage(SEARCH) << endl;
-            return 1;
-        }
+    //     if (!OUTFILE.is_open()) {
+    //         cerr << "Please specifiy output file with '-o'" << endl;
+    //         cerr << Usage(SEARCH) << endl;
+    //         return 1;
+    //     }
 
-        ifstream signature_file;
-        signature_file.open(signature_filepath);
+    //     ifstream signature_file;
+    //     signature_file.open(signature_filepath);
 
-        if (!signature_file.is_open()) {
-            cerr << "Error opening signature file: " << signature_filepath << endl;
-            cerr << Usage(SEARCH) << endl;
-            return 1;
-        }
+    //     if (!signature_file.is_open()) {
+    //         cerr << "Error opening signature file: " << signature_filepath << endl;
+    //         cerr << Usage(SEARCH) << endl;
+    //         return 1;
+    //     }
 
-        string line;
+    //     string line;
 
-        // Read and match signature generation metadata
-        getline(signature_file, line, ',');
-        KMER_LEN = stoi(line);
+    //     // Read and match signature generation metadata
+    //     getline(signature_file, line, ',');
+    //     KMER_LEN = stoi(line);
 
-        getline(signature_file, line, ',');
-        SIGNATURE_WIDTH = stoi(line);
+    //     getline(signature_file, line, ',');
+    //     SIGNATURE_WIDTH = stoi(line);
 
-        getline(signature_file, line);
-        SIGNATURE_DENSITY = stoi(line);
+    //     getline(signature_file, line);
+    //     SIGNATURE_DENSITY = stoi(line);
 
-        streampos start = signature_file.tellg();
+    //     streampos start = signature_file.tellg();
 
-        vector<double> results[query_files.size()];
-        vector<string> signature_targets;
+    //     vector<double> results[query_files.size()];
+    //     vector<string> signature_targets;
 
-        for (uint i = 0; i < query_files.size(); i++) {
-            string query_signature = GenerateSignature(query_files[i]);
+    //     for (uint i = 0; i < query_files.size(); i++) {
+    //         string query_signature = GenerateSignature(query_files[i]);
 
-            while (getline(signature_file, line)) {
-                if (line[0] == '>') {
-                    if (i == 0) signature_targets.push_back(line.substr(1, line.length()));
-                } else {
-                    // Signature
-                    uint hamming_dist = 0;
+    //         while (getline(signature_file, line)) {
+    //             if (line[0] == '>') {
+    //                 if (i == 0) signature_targets.push_back(line.substr(1, line.length()));
+    //             } else {
+    //                 // Signature
+    //                 uint hamming_dist = 0;
 
-                    for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
-                        if (query_signature[i] != line[i]) {
-                            hamming_dist++;
-                        }
-                    }
+    //                 for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
+    //                     if (query_signature[i] != line[i]) {
+    //                         hamming_dist++;
+    //                     }
+    //                 }
 
-                    results[i].push_back(abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH);
-                    // results[i].push_back(hamming_dist);
-                }
-            }
+    //                 results[i].push_back(abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH);
+    //                 // results[i].push_back(hamming_dist);
+    //             }
+    //         }
 
-            signature_file.clear();
-            signature_file.seekg(start);
-        }
+    //         signature_file.clear();
+    //         signature_file.seekg(start);
+    //     }
 
-        signature_file.close();
+    //     signature_file.close();
 
-        // Output result tsv
-        for (string query_file : query_files) {
-            OUTFILE << '\t' << query_file;
-        }
+    //     // Output result tsv
+    //     for (string query_file : query_files) {
+    //         OUTFILE << '\t' << query_file;
+    //     }
 
-        OUTFILE << endl;
+    //     OUTFILE << endl;
 
-        for (uint i = 0; i < signature_targets.size(); i++) {
-            OUTFILE << signature_targets[i];
+    //     for (uint i = 0; i < signature_targets.size(); i++) {
+    //         OUTFILE << signature_targets[i];
 
-            for (vector<double> result : results) {
-                OUTFILE << '\t' << to_string(result[i]);
-            }
+    //         for (vector<double> result : results) {
+    //             OUTFILE << '\t' << to_string(result[i]);
+    //         }
 
-            OUTFILE << endl;
-        }
+    //         OUTFILE << endl;
+    //     }
 
-        OUTFILE.close();
-        return 0;
-    }
+    //     OUTFILE.close();
+    //     return 0;
+    // }
     // --------------------------------------------------------------------------------------------
 
     cerr << Usage(GENERAL) << endl;
