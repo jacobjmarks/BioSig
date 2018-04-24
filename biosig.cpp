@@ -83,22 +83,16 @@ void GenerateSignature(string sequence, string seq_header) {
             }
         }
     }
-    
-    char compressed_output[SIGNATURE_BYTE_COUNT];
 
-    uint index = 0;
-    for (uint i = 0; i < SIGNATURE_BYTE_COUNT; i++) {
-        for (int j = 7; j >= 0; j--) {
-            if (signature[index++] > 0) {
-                compressed_output[i] |= (1 << j);
-            }
-        }
+    string flatsig;
+    for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
+        flatsig += (signature[i] > 0 ? '1' : '0');
     }
 
     #pragma omp critical(write_out)
     {
         OUTFILE << '>' << seq_header << endl;
-        OUTFILE << string(compressed_output) << endl;
+        OUTFILE << flatsig << endl;
     }
 }
 
