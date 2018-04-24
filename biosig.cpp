@@ -49,7 +49,12 @@ string Usage(Use use) {
     }
 }
 
-void GenerateSignature(string sequence, string seq_header) {
+struct Fasta {
+    string header;
+    string sequence;
+};
+
+void GenerateSignature(string sequence, string &result) {
     default_random_engine random_generator;
     uniform_int_distribution<int> int_distribution(0, SIGNATURE_WIDTH - 1);
 
@@ -84,15 +89,10 @@ void GenerateSignature(string sequence, string seq_header) {
         }
     }
 
-    string flatsig;
-    for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
-        flatsig += (signature[i] > 0 ? '1' : '0');
-    }
+    result.reserve(SIGNATURE_WIDTH);
 
-    #pragma omp critical(write_out)
-    {
-        OUTFILE << '>' << seq_header << endl;
-        OUTFILE << flatsig << endl;
+    for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
+        result += (signature[i] > 0 ? '1' : '0');
     }
 }
 
@@ -183,29 +183,44 @@ int main(int argc, char * argv[]) {
                     ifstream file;
                     file.open(filepath);
 
-                    string sequence;
-                    string seq_header;
+                    Fasta fasta;
 
                     char ch;
                     while((ch = file.get()) != EOF) {
                         if (ch == '>') {
-                            if (!sequence.empty()) {
+                            if (!fasta.sequence.empty()) {
                                 #pragma omp task
-                                GenerateSignature(sequence, seq_header);
-                                sequence.clear();
-                                seq_header.clear();
+                                {
+                                    string signature;
+                                    GenerateSignature(fasta.sequence, signature);
+                                    #pragma omp critical(write_out)
+                                    {
+                                        OUTFILE << '>' << fasta.header << endl;
+                                        OUTFILE << signature << endl;
+                                    }
+                                }
+                                fasta.header.clear();
+                                fasta.sequence.clear();
                             }
-                            while ((ch = file.get()) != '\n') seq_header += ch;
+                            while ((ch = file.get()) != '\n') fasta.header += ch;
                         } else if (ch == '\n' || ch == '\r') {
                             // Skip
                         } else {
-                            sequence += ch;
+                            fasta.sequence += ch;
                         }
                     }
 
-                    if (!sequence.empty()) {
+                    if (!fasta.sequence.empty()) {
                         #pragma omp task
-                        GenerateSignature(sequence, seq_header);
+                        {
+                            string signature;
+                            GenerateSignature(fasta.sequence, signature);
+                            #pragma omp critical(write_out)
+                            {
+                                OUTFILE << '>' << fasta.header << endl;
+                                OUTFILE << signature << endl;
+                            }
+                        }
                     }
 
                     #pragma omp taskwait
