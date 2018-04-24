@@ -5,6 +5,7 @@
 #include <chrono>
 #include <random>
 #include <omp.h>
+#include <algorithm>
 
 // DEFAULTS -----------------------
 static uint KMER_LEN = 5;
@@ -18,9 +19,15 @@ using namespace chrono;
 
 ofstream OUTFILE;
 
-struct Sequence {
+typedef struct {
     string id;
     string value;
+} Sequence, Signature;
+
+struct SearchResult {
+    string query;
+    string target;
+    uint hamming_dist = 0;
 };
 
 enum Use {
@@ -100,6 +107,12 @@ void ForEachSequence(const string filepath, function<void(const Sequence &sequen
     ifstream file;
     file.open(filepath);
 
+    if (!file.is_open()) {
+        cerr << endl;
+        cerr << "Error opening file: " << filepath << endl;
+        exit(1);
+    }
+
     Sequence sequence;
 
     char ch;
@@ -108,8 +121,9 @@ void ForEachSequence(const string filepath, function<void(const Sequence &sequen
             if (!sequence.value.empty()) {
                 func(sequence);
             }
-            getline(file, sequence.id);
+            sequence.id.clear();
             sequence.value.clear();
+            while((ch = file.get()) != '\n' && ch != '\r') sequence.id += ch;
         } else if (ch == '\n' || ch == '\r') {
             // Skip
         } else {
@@ -119,6 +133,34 @@ void ForEachSequence(const string filepath, function<void(const Sequence &sequen
 
     if (!sequence.id.empty()) {
         func(sequence);
+    }
+}
+
+void ForEachSignature(const string filepath, function<void(const Signature &signature)> func) {
+    ifstream file;
+    file.open(filepath);
+
+    if (!file.is_open()) {
+        cerr << endl;
+        cerr << "Error opening file: " << filepath << endl;
+        exit(1);
+    }
+
+    string line;
+
+    // Skip meta
+    getline(file, line);
+
+    Signature signature;
+
+    while(getline(file, line)) {
+        if (line[0] == '>') {
+            signature.id = line.substr(1);
+        } else {
+            signature.value = line;
+
+            func(signature);
+        }
     }
 }
 
@@ -233,124 +275,121 @@ int main(int argc, char * argv[]) {
     // --------------------------------------------------------------------------------------------
 
     // SEARCH -------------------------------------------------------------------------------------
-    // if (use == "search") {
-    //     if (argc < 6) {
-    //         cerr << Usage(SEARCH) << endl;
-    //         return 1;
-    //     }
+    if (use == "search") {
+        if (argc < 6) {
+            cerr << Usage(SEARCH) << endl;
+            return 1;
+        }
 
-    //     string signature_filepath;
-    //     vector<string> query_files;
+        string signature_filepath;
+        vector<string> query_files;
 
-    //     // Argument parsing
-    //     for (int i = 2; i < argc; i++) {
-    //         string arg = string(argv[i]);
+        // Argument parsing
+        for (int i = 2; i < argc; i++) {
+            string arg = string(argv[i]);
 
-    //         if (arg[0] == '-') {
-    //             // Configuration
-    //             string setting = arg.substr(1, arg.length());     
+            if (arg[0] == '-') {
+                // Configuration
+                string setting = arg.substr(1, arg.length());     
 
-    //             if (setting == "o") {
-    //                 OUTFILE.open(argv[++i]);
-    //                 if (!OUTFILE.is_open()) {
-    //                     cerr << "Cannot open file for writing: " << argv[i] << endl;
-    //                     cerr << Usage(SEARCH) << endl;
-    //                     return 1;
-    //                 }
-    //                 continue;
-    //             }
+                if (setting == "o") {
+                    OUTFILE.open(argv[++i]);
+                    if (!OUTFILE.is_open()) {
+                        cerr << "Cannot open file for writing: " << argv[i] << endl;
+                        cerr << Usage(SEARCH) << endl;
+                        return 1;
+                    }
+                    continue;
+                }
 
-    //             cerr << "Unknown param: -" << setting << endl;
-    //             cerr << Usage(SEARCH) << endl;
-    //             return 1;
-    //         } else {
-    //             if (signature_filepath.empty()) {
-    //                 signature_filepath = arg;
-    //             } else {
-    //                 query_files.push_back(arg);
-    //             }
-    //         }
-    //     }
+                cerr << "Unknown param: -" << setting << endl;
+                cerr << Usage(SEARCH) << endl;
+                return 1;
+            } else {
+                if (signature_filepath.empty()) {
+                    signature_filepath = arg;
+                } else {
+                    query_files.push_back(arg);
+                }
+            }
+        }
 
-    //     if (!OUTFILE.is_open()) {
-    //         cerr << "Please specifiy output file with '-o'" << endl;
-    //         cerr << Usage(SEARCH) << endl;
-    //         return 1;
-    //     }
+        if (!OUTFILE.is_open()) {
+            cerr << "Please specifiy output file with '-o'" << endl;
+            cerr << Usage(SEARCH) << endl;
+            return 1;
+        }
 
-    //     ifstream signature_file;
-    //     signature_file.open(signature_filepath);
+        ifstream signature_file;
+        signature_file.open(signature_filepath);
 
-    //     if (!signature_file.is_open()) {
-    //         cerr << "Error opening signature file: " << signature_filepath << endl;
-    //         cerr << Usage(SEARCH) << endl;
-    //         return 1;
-    //     }
+        if (!signature_file.is_open()) {
+            cerr << "Error opening signature file: " << signature_filepath << endl;
+            cerr << Usage(SEARCH) << endl;
+            return 1;
+        }
 
-    //     string line;
+        string line;
 
-    //     // Read and match signature generation metadata
-    //     getline(signature_file, line, ',');
-    //     KMER_LEN = stoi(line);
+        // Read and match signature generation metadata
+        getline(signature_file, line, ',');
+        KMER_LEN = stoi(line);
 
-    //     getline(signature_file, line, ',');
-    //     SIGNATURE_WIDTH = stoi(line);
+        getline(signature_file, line, ',');
+        SIGNATURE_WIDTH = stoi(line);
 
-    //     getline(signature_file, line);
-    //     SIGNATURE_DENSITY = stoi(line);
+        getline(signature_file, line);
+        SIGNATURE_DENSITY = stoi(line);
 
-    //     streampos start = signature_file.tellg();
+        signature_file.close();
 
-    //     vector<double> results[query_files.size()];
-    //     vector<string> signature_targets;
+        cerr << "Searching...";
+        high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-    //     for (uint i = 0; i < query_files.size(); i++) {
-    //         string query_signature = GenerateSignature(query_files[i]);
+        vector<SearchResult> results;
 
-    //         while (getline(signature_file, line)) {
-    //             if (line[0] == '>') {
-    //                 if (i == 0) signature_targets.push_back(line.substr(1, line.length()));
-    //             } else {
-    //                 // Signature
-    //                 uint hamming_dist = 0;
+        for (string query_filepath : query_files) {
+            ForEachSequence(query_filepath, [signature_filepath, &results](const Sequence &sequence) {
+                string query_signature;
+                GenerateSignature(sequence.value, query_signature);
 
-    //                 for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
-    //                     if (query_signature[i] != line[i]) {
-    //                         hamming_dist++;
-    //                     }
-    //                 }
+                vector<SearchResult> these_results;
 
-    //                 results[i].push_back(abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH);
-    //                 // results[i].push_back(hamming_dist);
-    //             }
-    //         }
+                ForEachSignature(signature_filepath, [&](const Signature &target_signature) {
+                    SearchResult result;
+                    result.query = sequence.id;
+                    result.target = target_signature.id;
 
-    //         signature_file.clear();
-    //         signature_file.seekg(start);
-    //     }
+                    for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
+                        if (query_signature[i] != target_signature.value[i]) {
+                            result.hamming_dist++;
+                        }
+                    }
 
-    //     signature_file.close();
+                    these_results.push_back(result);
+                });
 
-    //     // Output result tsv
-    //     for (string query_file : query_files) {
-    //         OUTFILE << '\t' << query_file;
-    //     }
+                sort(these_results.begin(), these_results.end(), [](SearchResult a, SearchResult b) {
+                    return a.hamming_dist < b.hamming_dist;
+                });
 
-    //     OUTFILE << endl;
+                for (SearchResult result : these_results) {
+                    results.push_back(result);
+                }
+            });
+        }
 
-    //     for (uint i = 0; i < signature_targets.size(); i++) {
-    //         OUTFILE << signature_targets[i];
+        high_resolution_clock::time_point t2 = high_resolution_clock::now();
+        duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
+        cerr << time_span.count() << 's' << endl;
 
-    //         for (vector<double> result : results) {
-    //             OUTFILE << '\t' << to_string(result[i]);
-    //         }
+        for (SearchResult result : results) {
+            OUTFILE << result.query << ',' << result.target << ',' << result.hamming_dist << endl;
+        }
 
-    //         OUTFILE << endl;
-    //     }
-
-    //     OUTFILE.close();
-    //     return 0;
-    // }
+        OUTFILE.close();
+        return 0;
+    }
     // --------------------------------------------------------------------------------------------
 
     cerr << Usage(GENERAL) << endl;
