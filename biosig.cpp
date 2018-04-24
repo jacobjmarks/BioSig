@@ -18,6 +18,11 @@ using namespace chrono;
 
 ofstream OUTFILE;
 
+struct Sequence {
+    string id;
+    string value;
+};
+
 enum Use {
     GENERAL, INDEX, SEARCH
 };
@@ -48,11 +53,6 @@ string Usage(Use use) {
             break;
     }
 }
-
-struct Fasta {
-    string header;
-    string sequence;
-};
 
 void GenerateSignature(const string &sequence, string &result) {
     default_random_engine random_generator;
@@ -96,13 +96,29 @@ void GenerateSignature(const string &sequence, string &result) {
     }
 }
 
-void IndexFasta(const Fasta &fasta) {
-    string signature;
-    GenerateSignature(fasta.sequence, signature);
-    #pragma omp critical(write_out)
-    {
-        OUTFILE << '>' << fasta.header << endl;
-        OUTFILE << signature << endl;
+void ForEachSequence(const string filepath, function<void(const Sequence &sequence)> func) {
+    ifstream file;
+    file.open(filepath);
+
+    Sequence sequence;
+
+    char ch;
+    while((ch = file.get()) != EOF) {
+        if (ch == '>') {
+            if (!sequence.value.empty()) {
+                func(sequence);
+            }
+            getline(file, sequence.id);
+            sequence.value.clear();
+        } else if (ch == '\n' || ch == '\r') {
+            // Skip
+        } else {
+            sequence.value += ch;
+        }
+    }
+
+    if (!sequence.id.empty()) {
+        func(sequence);
     }
 }
 
@@ -190,31 +206,18 @@ int main(int argc, char * argv[]) {
                     cerr << "\tIndexing...";
                     high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-                    ifstream file;
-                    file.open(filepath);
-
-                    Fasta fasta;
-
-                    char ch;
-                    while((ch = file.get()) != EOF) {
-                        if (ch == '>') {
-                            if (!fasta.sequence.empty()) {
-                                #pragma omp task
-                                IndexFasta(fasta);
-                            }
-                            getline(file, fasta.header);
-                            fasta.sequence.clear();
-                        } else if (ch == '\n' || ch == '\r') {
-                            // Skip
-                        } else {
-                            fasta.sequence += ch;
-                        }
-                    }
-
-                    if (!fasta.sequence.empty()) {
+                    ForEachSequence(filepath, [](const Sequence &sequence){
                         #pragma omp task
-                        IndexFasta(fasta);
-                    }
+                        {
+                            string signature;
+                            GenerateSignature(sequence.value, signature);
+                            #pragma omp critical(write_out)
+                            {
+                                OUTFILE << '>' << sequence.id << endl;
+                                OUTFILE << signature << endl;
+                            }
+                        }
+                    });
 
                     #pragma omp taskwait
 
