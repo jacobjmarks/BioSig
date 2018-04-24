@@ -54,7 +54,7 @@ struct Fasta {
     string sequence;
 };
 
-void GenerateSignature(string sequence, string &result) {
+void GenerateSignature(const string &sequence, string &result) {
     default_random_engine random_generator;
     uniform_int_distribution<int> int_distribution(0, SIGNATURE_WIDTH - 1);
 
@@ -93,6 +93,16 @@ void GenerateSignature(string sequence, string &result) {
 
     for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
         result += (signature[i] > 0 ? '1' : '0');
+    }
+}
+
+void IndexFasta(const Fasta &fasta) {
+    string signature;
+    GenerateSignature(fasta.sequence, signature);
+    #pragma omp critical(write_out)
+    {
+        OUTFILE << '>' << fasta.header << endl;
+        OUTFILE << signature << endl;
     }
 }
 
@@ -190,19 +200,10 @@ int main(int argc, char * argv[]) {
                         if (ch == '>') {
                             if (!fasta.sequence.empty()) {
                                 #pragma omp task
-                                {
-                                    string signature;
-                                    GenerateSignature(fasta.sequence, signature);
-                                    #pragma omp critical(write_out)
-                                    {
-                                        OUTFILE << '>' << fasta.header << endl;
-                                        OUTFILE << signature << endl;
-                                    }
-                                }
-                                fasta.header.clear();
-                                fasta.sequence.clear();
+                                IndexFasta(fasta);
                             }
-                            while ((ch = file.get()) != '\n') fasta.header += ch;
+                            getline(file, fasta.header);
+                            fasta.sequence.clear();
                         } else if (ch == '\n' || ch == '\r') {
                             // Skip
                         } else {
@@ -212,15 +213,7 @@ int main(int argc, char * argv[]) {
 
                     if (!fasta.sequence.empty()) {
                         #pragma omp task
-                        {
-                            string signature;
-                            GenerateSignature(fasta.sequence, signature);
-                            #pragma omp critical(write_out)
-                            {
-                                OUTFILE << '>' << fasta.header << endl;
-                                OUTFILE << signature << endl;
-                            }
-                        }
+                        IndexFasta(fasta);
                     }
 
                     #pragma omp taskwait
