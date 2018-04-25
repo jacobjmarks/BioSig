@@ -24,12 +24,6 @@ typedef struct {
     string value;
 } Sequence, Signature;
 
-struct SearchResult {
-    string query;
-    string target;
-    uint hamming_dist = 0;
-};
-
 enum Use {
     GENERAL, INDEX, SEARCH
 };
@@ -103,7 +97,7 @@ void GenerateSignature(const string &sequence, string &result) {
     }
 }
 
-void ForEachSequence(const string filepath, function<void(const Sequence &sequence)> func) {
+void ForEachSequence(const string filepath, function<void(Sequence sequence)> func) {
     ifstream file;
     file.open(filepath);
 
@@ -134,9 +128,11 @@ void ForEachSequence(const string filepath, function<void(const Sequence &sequen
     if (!sequence.id.empty()) {
         func(sequence);
     }
+
+    file.close();
 }
 
-void ForEachSignature(const string filepath, function<void(const Signature &signature)> func) {
+void ForEachSignature(const string filepath, function<void(Signature signature)> func) {
     ifstream file;
     file.open(filepath);
 
@@ -162,6 +158,8 @@ void ForEachSignature(const string filepath, function<void(const Signature &sign
             func(signature);
         }
     }
+
+    file.close();
 }
 
 int main(int argc, char * argv[]) {
@@ -346,35 +344,38 @@ int main(int argc, char * argv[]) {
         cerr << "Searching...";
         high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-        vector<SearchResult> results;
-
+        #pragma omp parallel
+        #pragma omp single
         for (string query_filepath : query_files) {
-            ForEachSequence(query_filepath, [signature_filepath, &results](const Sequence &sequence) {
-                string query_signature;
-                GenerateSignature(sequence.value, query_signature);
+            ForEachSequence(query_filepath, [&signature_filepath](Sequence sequence) {
+                #pragma omp task
+                {
+                    string query_signature;
+                    GenerateSignature(sequence.value, query_signature);
 
-                vector<SearchResult> these_results;
+                    // Result <Target, Dist>
+                    vector<pair<string, uint>> these_results;
 
-                ForEachSignature(signature_filepath, [&](const Signature &target_signature) {
-                    SearchResult result;
-                    result.query = sequence.id;
-                    result.target = target_signature.id;
+                    ForEachSignature(signature_filepath, [&](Signature target_signature) {
+                        uint hamming_dist = 0;
 
-                    for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
-                        if (query_signature[i] != target_signature.value[i]) {
-                            result.hamming_dist++;
+                        for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
+                            if (query_signature[i] != target_signature.value[i]) {
+                                hamming_dist++;
+                            }
                         }
+
+                        these_results.push_back(pair<string, uint>(target_signature.id, hamming_dist));
+                    });
+
+                    sort(these_results.begin(), these_results.end(), [](auto a, auto b) {
+                        return a.second < b.second;
+                    });
+
+                    #pragma omp critical(write_out)
+                    for (auto result : these_results) {
+                        OUTFILE << sequence.id << ',' << result.first << ',' << result.second << endl;
                     }
-
-                    these_results.push_back(result);
-                });
-
-                sort(these_results.begin(), these_results.end(), [](SearchResult a, SearchResult b) {
-                    return a.hamming_dist < b.hamming_dist;
-                });
-
-                for (SearchResult result : these_results) {
-                    results.push_back(result);
                 }
             });
         }
@@ -382,10 +383,6 @@ int main(int argc, char * argv[]) {
         high_resolution_clock::time_point t2 = high_resolution_clock::now();
         duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
         cerr << time_span.count() << 's' << endl;
-
-        for (SearchResult result : results) {
-            OUTFILE << result.query << ',' << result.target << ',' << result.hamming_dist << endl;
-        }
 
         OUTFILE.close();
         return 0;
