@@ -238,34 +238,30 @@ int main(int argc, char * argv[]) {
         OUTFILE << KMER_LEN << ',' << SIGNATURE_WIDTH << ',' << SIGNATURE_DENSITY << endl;
 
         #pragma omp parallel
-        {
-            #pragma omp single
-            {
-                for (string filepath : input_files) {
-                    cerr << filepath << endl;
-                    cerr << "\tIndexing...";
-                    high_resolution_clock::time_point t1 = high_resolution_clock::now();
+        #pragma omp single
+        for (string filepath : input_files) {
+            cerr << filepath << endl;
+            cerr << "\tIndexing...";
+            high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-                    ForEachSequence(filepath, [](const Sequence &sequence){
-                        #pragma omp task
-                        {
-                            string signature;
-                            GenerateSignature(sequence.value, signature);
-                            #pragma omp critical(write_out)
-                            {
-                                OUTFILE << '>' << sequence.id << endl;
-                                OUTFILE << signature << endl;
-                            }
-                        }
-                    });
-
-                    #pragma omp taskwait
-
-                    high_resolution_clock::time_point t2 = high_resolution_clock::now();
-                    duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
-                    cerr << time_span.count() << 's' << endl;
+            ForEachSequence(filepath, [](const Sequence &sequence){
+                #pragma omp task
+                {
+                    string signature;
+                    GenerateSignature(sequence.value, signature);
+                    #pragma omp critical(write_out)
+                    {
+                        OUTFILE << '>' << sequence.id << endl;
+                        OUTFILE << signature << endl;
+                    }
                 }
-            }
+            });
+
+            #pragma omp taskwait
+
+            high_resolution_clock::time_point t2 = high_resolution_clock::now();
+            duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
+            cerr << time_span.count() << 's' << endl;
         }
 
         return 0;
