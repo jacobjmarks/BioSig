@@ -97,10 +97,11 @@ void GenerateSignature(const string &sequence, string &result) {
     }
 }
 
-void ForEachSequence(const string filepath, function<void(Sequence sequence)> func) {
+void ForEachSequence(const string filepath, const function<void(const Sequence &)> &&func) {
     ifstream file;
     file.open(filepath);
 
+    #pragma omp critical(exit)
     if (!file.is_open()) {
         cerr << endl;
         cerr << "Error opening file: " << filepath << endl;
@@ -132,10 +133,11 @@ void ForEachSequence(const string filepath, function<void(Sequence sequence)> fu
     file.close();
 }
 
-void ForEachSignature(const string filepath, function<void(Signature signature)> func) {
+void ForEachSignature(const string filepath, const function<void(const Signature &)> &&func) {
     ifstream file;
     file.open(filepath);
 
+    #pragma omp critical(exit)
     if (!file.is_open()) {
         cerr << endl;
         cerr << "Error opening file: " << filepath << endl;
@@ -343,7 +345,7 @@ int main(int argc, char * argv[]) {
         #pragma omp parallel
         #pragma omp single
         for (string query_filepath : query_files) {
-            ForEachSequence(query_filepath, [&signature_filepath](Sequence sequence) {
+            ForEachSequence(query_filepath, [&signature_filepath](const Sequence &sequence) {
                 #pragma omp task
                 {
                     string query_signature;
@@ -352,7 +354,7 @@ int main(int argc, char * argv[]) {
                     // Result <Target, Dist>
                     vector<pair<string, uint>> these_results;
 
-                    ForEachSignature(signature_filepath, [&](Signature target_signature) {
+                    ForEachSignature(signature_filepath, [&](const Signature &target_signature) {
                         uint hamming_dist = 0;
 
                         for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
