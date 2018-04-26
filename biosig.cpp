@@ -289,7 +289,7 @@ int main(int argc, char * argv[]) {
             return 1;
         }
 
-        string signature_filepath;
+        string target_filepath;
         vector<string> query_files;
 
         // Argument parsing
@@ -314,8 +314,8 @@ int main(int argc, char * argv[]) {
                 cerr << Usage(SEARCH) << endl;
                 return 1;
             } else {
-                if (signature_filepath.empty()) {
-                    signature_filepath = arg;
+                if (target_filepath.empty()) {
+                    target_filepath = arg;
                 } else {
                     query_files.push_back(arg);
                 }
@@ -328,11 +328,11 @@ int main(int argc, char * argv[]) {
             return 1;
         }
 
-        ifstream signature_file;
-        signature_file.open(signature_filepath);
+        ifstream target_file;
+        target_file.open(target_filepath);
 
-        if (!signature_file.is_open()) {
-            cerr << "Error opening signature file: " << signature_filepath << endl;
+        if (!target_file.is_open()) {
+            cerr << "Error opening signature file: " << target_filepath << endl;
             cerr << Usage(SEARCH) << endl;
             return 1;
         }
@@ -340,16 +340,16 @@ int main(int argc, char * argv[]) {
         string line;
 
         // Read and match signature generation metadata
-        getline(signature_file, line, ',');
+        getline(target_file, line, ',');
         KMER_LEN = stoi(line);
 
-        getline(signature_file, line, ',');
+        getline(target_file, line, ',');
         SIGNATURE_WIDTH = stoi(line);
 
-        getline(signature_file, line);
+        getline(target_file, line);
         SIGNATURE_DENSITY = stoi(line);
 
-        signature_file.close();
+        target_file.close();
 
         cerr << "Searching...";
         high_resolution_clock::time_point t1 = high_resolution_clock::now();
@@ -357,37 +357,47 @@ int main(int argc, char * argv[]) {
         #pragma omp parallel
         #pragma omp single
         for (string query_filepath : query_files) {
-            ForEachSequence(query_filepath, [&signature_filepath](const Sequence &sequence) {
+            ForEachSignature(query_filepath, [&](const Signature &query_signature) {
                 #pragma omp task
                 {
-                    string query_signature;
-                    GenerateSignature(sequence.value, query_signature);
-
                     vector<SearchResult> these_results;
 
-                    ForEachSignature(signature_filepath, [&](const Signature &target_signature) {
+                    ForEachSignature(target_filepath, [&](const Signature &target_signature) {
                         uint hamming_dist = 0;
 
                         for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
-                            if (query_signature[i] != target_signature.value[i]) {
+                            if (query_signature.value[i] != target_signature.value[i]) {
                                 hamming_dist++;
                             }
                         }
 
-                        double normalised_dist = abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH;
+                        double normalised_dist =
+                            abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH;
 
                         if (normalised_dist >= DIST_THRESHOLD) {
-                            these_results.push_back(SearchResult(target_signature.id, hamming_dist, normalised_dist));
+                            these_results.push_back(
+                                SearchResult(target_signature.id, hamming_dist, normalised_dist)
+                            );
                         }
                     });
 
-                    sort(these_results.begin(), these_results.end(), [](SearchResult a, SearchResult b) {
-                        return a.normalised_dist > b.normalised_dist;
-                    });
+                    sort(these_results.begin(), these_results.end(),
+                        [](SearchResult a, SearchResult b) {
+                            return a.hamming_dist < b.hamming_dist;
+                        }
+                    );
 
                     #pragma omp critical(write_out)
-                    for (auto result : these_results) {
-                        OUTFILE << sequence.id << '\t' << result.target << '\t' << result.hamming_dist << '\t' << result.normalised_dist << endl;
+                    for (const SearchResult &result : these_results) {
+                        OUTFILE
+                            << query_signature.id
+                            << '\t'
+                            << result.target
+                            << '\t'
+                            << result.hamming_dist
+                            << '\t'
+                            << result.normalised_dist
+                            << endl;
                     }
                 }
             });
