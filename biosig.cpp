@@ -6,11 +6,13 @@
 #include <random>
 #include <omp.h>
 #include <algorithm>
+#include <tuple>
 
 // DEFAULTS -----------------------
 static uint KMER_LEN = 5;
 static uint SIGNATURE_WIDTH = 1024;
 static uint SIGNATURE_DENSITY = 19;
+static double DIST_THRESHOLD = 0.5;
 // --------------------------------
 static uint SIGNATURE_BYTE_COUNT = SIGNATURE_WIDTH / 8;
 
@@ -23,6 +25,18 @@ typedef struct {
     string id;
     string value;
 } Sequence, Signature;
+
+struct SearchResult {
+    string target;
+    uint hamming_dist;
+    double normalised_dist;
+
+    SearchResult(string target, uint hamming_dist, double normalised_dist) {
+        SearchResult::target = target;
+        SearchResult::hamming_dist = hamming_dist;
+        SearchResult::normalised_dist = normalised_dist;
+    }
+};
 
 enum Use {
     GENERAL, INDEX, SEARCH
@@ -160,8 +174,6 @@ void ForEachSignature(const string filepath, const function<void(const Signature
             func(signature);
         }
     }
-
-    file.close();
 }
 
 int main(int argc, char * argv[]) {
@@ -351,8 +363,7 @@ int main(int argc, char * argv[]) {
                     string query_signature;
                     GenerateSignature(sequence.value, query_signature);
 
-                    // Result <Target, Dist>
-                    vector<pair<string, uint>> these_results;
+                    vector<SearchResult> these_results;
 
                     ForEachSignature(signature_filepath, [&](const Signature &target_signature) {
                         uint hamming_dist = 0;
@@ -363,16 +374,20 @@ int main(int argc, char * argv[]) {
                             }
                         }
 
-                        these_results.push_back(pair<string, uint>(target_signature.id, hamming_dist));
+                        double normalised_dist = abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH;
+
+                        if (normalised_dist >= DIST_THRESHOLD) {
+                            these_results.push_back(SearchResult(target_signature.id, hamming_dist, normalised_dist));
+                        }
                     });
 
-                    sort(these_results.begin(), these_results.end(), [](auto a, auto b) {
-                        return a.second < b.second;
+                    sort(these_results.begin(), these_results.end(), [](SearchResult a, SearchResult b) {
+                        return a.normalised_dist > b.normalised_dist;
                     });
 
                     #pragma omp critical(write_out)
                     for (auto result : these_results) {
-                        OUTFILE << sequence.id << ',' << result.first << ',' << result.second << endl;
+                        OUTFILE << sequence.id << '\t' << result.target << '\t' << result.hamming_dist << '\t' << result.normalised_dist << endl;
                     }
                 }
             });
@@ -382,7 +397,6 @@ int main(int argc, char * argv[]) {
         duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
         cerr << time_span.count() << 's' << endl;
 
-        OUTFILE.close();
         return 0;
     }
     // --------------------------------------------------------------------------------------------
