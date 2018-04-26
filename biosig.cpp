@@ -382,7 +382,7 @@ int main(int argc, char * argv[]) {
                     });
 
                     sort(these_results.begin(), these_results.end(),
-                        [](SearchResult a, SearchResult b) {
+                        [](const SearchResult &a, const SearchResult &b) {
                             return a.hamming_dist < b.hamming_dist;
                         }
                     );
