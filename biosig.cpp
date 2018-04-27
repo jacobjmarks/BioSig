@@ -111,7 +111,8 @@ void GenerateSignature(const string &sequence, string &result) {
     }
 }
 
-void ForEachSequence(const string filepath, const function<void(const Sequence &)> &&func) {
+template<typename FUNC>
+void ForEachSequence(const string filepath, const FUNC &func) {
     ifstream file;
     file.open(filepath);
 
@@ -147,7 +148,8 @@ void ForEachSequence(const string filepath, const function<void(const Sequence &
     file.close();
 }
 
-void ForEachSignature(const string filepath, const function<void(const Signature &)> &&func) {
+template<typename FUNC>
+void ForEachSignature(const string filepath, const FUNC &func) {
     ifstream file;
     file.open(filepath);
 
