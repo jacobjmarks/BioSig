@@ -169,12 +169,14 @@ void ForEachSignature(const string filepath, const FUNC &func) {
 
     Signature signature;
 
-    while(getline(file, line)) {
-        if (line[0] == '>') {
-            signature.id = line.substr(1);
-        } else {
-            signature.value = line;
-
+    char ch;
+    while((ch = file.get()) != EOF) {
+        if (ch == '>') {
+            getline(file, signature.id);
+            signature.value.clear();
+            for (uint i = 0; i < SIGNATURE_WIDTH / 8; i++) {
+                signature.value += (ch = file.get());
+            }
             func(signature);
         }
     }
@@ -368,8 +370,12 @@ int main(int argc, char * argv[]) {
                     ForEachSignature(target_filepath, [&](const Signature &target_signature) {
                         uint hamming_dist = 0;
 
-                        for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
-                            if (query_signature.value[i] != target_signature.value[i]) {
+                        for (uint i = 0; i < SIGNATURE_WIDTH / 8; i++) {
+                            char xOR = query_signature.value[i] ^ target_signature.value[i];
+
+                            // Brian Kernighan pop count
+                            while (xOR != 0) {
+                                xOR &= (xOR - 1);
                                 hamming_dist++;
                             }
                         }
