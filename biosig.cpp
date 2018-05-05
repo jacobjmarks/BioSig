@@ -6,7 +6,6 @@
 #include <random>
 #include <omp.h>
 #include <algorithm>
-#include <tuple>
 
 // DEFAULTS -----------------------
 static uint KMER_LEN = 5;
@@ -14,7 +13,6 @@ static uint SIGNATURE_WIDTH = 1024;
 static uint SIGNATURE_DENSITY = 19;
 static double DIST_THRESHOLD = 0.5;
 // --------------------------------
-static uint SIGNATURE_BYTE_COUNT = SIGNATURE_WIDTH / 8;
 
 using namespace std;
 using namespace chrono;
@@ -104,10 +102,14 @@ void GenerateSignature(const string &sequence, string &result) {
         }
     }
 
-    result.reserve(SIGNATURE_WIDTH);
+    result.reserve(SIGNATURE_WIDTH / 8);
 
-    for (uint i = 0; i < SIGNATURE_WIDTH; i++) {
-        result += (signature[i] > 0 ? '1' : '0');
+    char bit = 0;
+    for (uint i = 0; i < SIGNATURE_WIDTH / 8; i++) {
+        for (uint j = 0; j < 8; j++) {
+            bit ^= (-(signature[(i * 8) + j] > 0 ? 1 : 0) ^ bit) & (1UL << (-j + 7));
+        }
+        result += bit;
     }
 }
 
@@ -210,7 +212,6 @@ int main(int argc, char * argv[]) {
 
                 if (setting == "sigwidth") {
                     SIGNATURE_WIDTH = stoi(argv[++i]);
-                    cerr << SIGNATURE_WIDTH << endl;
                     continue;
                 }
 
