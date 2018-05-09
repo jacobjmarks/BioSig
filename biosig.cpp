@@ -303,7 +303,12 @@ int main(int argc, char * argv[]) {
 
             if (arg[0] == '-') {
                 // Configuration
-                string setting = arg.substr(1, arg.length());     
+                string setting = arg.substr(1, arg.length());
+
+                if (setting == "threshold") {
+                    DIST_THRESHOLD = stod(argv[++i]);
+                    continue;
+                }
 
                 if (setting == "o") {
                     OUTFILE.open(argv[++i]);
