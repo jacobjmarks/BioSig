@@ -6,6 +6,7 @@
 #include <random>
 #include <omp.h>
 #include <algorithm>
+#include <queue>
 
 // DEFAULTS -----------------------
 static uint KMER_LEN = 5;
@@ -364,13 +365,18 @@ int main(int argc, char * argv[]) {
         cerr << "Searching...";
         high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
+        auto result_comparator = [](const SearchResult &a, const SearchResult &b) {
+            return a.hamming_dist < b.hamming_dist;
+        };
+
         #pragma omp parallel
         #pragma omp single
         for (string query_filepath : query_files) {
             ForEachSignature(query_filepath, [&](const Signature &query_signature) {
                 #pragma omp task
                 {
-                    vector<SearchResult> these_results;
+                    priority_queue<SearchResult, vector<SearchResult>, decltype(result_comparator)>
+                        these_results(result_comparator);
 
                     ForEachSignature(target_filepath, [&](const Signature &target_signature) {
                         uint hamming_dist = 0;
@@ -385,24 +391,22 @@ int main(int argc, char * argv[]) {
                             }
                         }
 
-                        double normalised_dist =
-                            abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH;
-
-                        if (normalised_dist >= DIST_THRESHOLD) {
-                            these_results.push_back(
-                                SearchResult(target_signature.id, hamming_dist, normalised_dist)
-                            );
-                        }
+                        these_results.emplace(
+                            target_signature.id,
+                            hamming_dist,
+                            abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH
+                        );
                     });
 
-                    sort(these_results.begin(), these_results.end(),
-                        [](const SearchResult &a, const SearchResult &b) {
-                            return a.hamming_dist < b.hamming_dist;
-                        }
-                    );
+                    deque<SearchResult> sorted_results;
+
+                    while(!these_results.empty()) {
+                        sorted_results.push_front(these_results.top());
+                        these_results.pop();
+                    }
 
                     #pragma omp critical(write_out)
-                    for (const SearchResult &result : these_results) {
+                    for(SearchResult &result : sorted_results) {
                         OUTFILE
                             << query_signature.id
                             << '\t'
