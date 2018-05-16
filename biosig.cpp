@@ -12,7 +12,7 @@
 static uint KMER_LEN = 5;
 static uint SIGNATURE_WIDTH = 1024;
 static uint SIGNATURE_DENSITY = 19;
-static double DIST_THRESHOLD = 0.5;
+static double DIST_THRESHOLD = 0.0;
 static uint RESULT_LIMIT = 0;
 // --------------------------------
 
@@ -397,14 +397,21 @@ int main(int argc, char * argv[]) {
                             }
                         }
 
-                        if ((!RESULT_LIMIT || these_results.size() < RESULT_LIMIT) || hamming_dist < these_results.top().hamming_dist) {
-                            these_results.emplace(
-                                target_signature.id,
-                                hamming_dist,
-                                abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH
-                            );
-                            
-                            if (RESULT_LIMIT && these_results.size() > RESULT_LIMIT) these_results.pop();
+                        double normalised_dist =
+                            abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH;
+
+                        if (normalised_dist >= DIST_THRESHOLD) {
+                            if ((!RESULT_LIMIT || these_results.size() < RESULT_LIMIT) || hamming_dist < these_results.top().hamming_dist) {
+                                these_results.emplace(
+                                    target_signature.id,
+                                    hamming_dist,
+                                    normalised_dist
+                                );
+                                
+                                if (RESULT_LIMIT && these_results.size() > RESULT_LIMIT) {
+                                    these_results.pop();
+                                }
+                            }
                         }
                     });
 
