@@ -13,6 +13,7 @@ static uint KMER_LEN = 5;
 static uint SIGNATURE_WIDTH = 1024;
 static uint SIGNATURE_DENSITY = 19;
 static double DIST_THRESHOLD = 0.5;
+static uint RESULT_LIMIT = 0;
 // --------------------------------
 
 using namespace std;
@@ -311,6 +312,11 @@ int main(int argc, char * argv[]) {
                     continue;
                 }
 
+                if (setting == "top") {
+                    RESULT_LIMIT = stoi(argv[++i]);
+                    continue;
+                }
+
                 if (setting == "o") {
                     OUTFILE.open(argv[++i]);
                     if (!OUTFILE.is_open()) {
@@ -391,11 +397,15 @@ int main(int argc, char * argv[]) {
                             }
                         }
 
-                        these_results.emplace(
-                            target_signature.id,
-                            hamming_dist,
-                            abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH
-                        );
+                        if ((!RESULT_LIMIT || these_results.size() < RESULT_LIMIT) || hamming_dist < these_results.top().hamming_dist) {
+                            these_results.emplace(
+                                target_signature.id,
+                                hamming_dist,
+                                abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH
+                            );
+                            
+                            if (RESULT_LIMIT && these_results.size() > RESULT_LIMIT) these_results.pop();
+                        }
                     });
 
                     deque<SearchResult> sorted_results;
