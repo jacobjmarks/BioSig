@@ -19,8 +19,6 @@ static uint RESULT_LIMIT = 0;
 using namespace std;
 using namespace chrono;
 
-ofstream OUTFILE;
-
 typedef struct {
     string id;
     string value;
@@ -48,11 +46,11 @@ string Usage(Use use) {
             return
             "Usage: ./biosig [OPTION]\n"
             "OPTION\n"
-            "    index     Generates a signature file from the given sequence files.\n"
+            "    index     Generates a signature file from the given sequence file/s.\n"
             "    search    Searches the documents in a given signature file.\n";
         case INDEX:
             return
-            "Usage: ./biosig index [OPTIONS] inputfile1 [inputfile2 [...]] -o outfile.bsig\n"
+            "Usage: ./biosig index [OPTIONS] sequenceFile [sequenceFile2 [...]] -o outfile.bsig\n"
             "OPTIONS\n"
             "    -kmerlen       Kmer length to hash.\n"
             "                   DEFAULT: 5\n"
@@ -62,7 +60,7 @@ string Usage(Use use) {
             "                   DEFAULT: 19\n";
         case SEARCH:
             return
-            "Usage: ./biosig search sigfile.bsig queryFile1 [queryFile2 [...]] -o outfile.tsv";
+            "Usage: ./biosig search targetSig.bsig querySig.bsig [querySig2.bsig [...]] -o outfile.tsv";
         default:
             return NULL;
             break;
@@ -153,34 +151,42 @@ void ForEachSequence(const string filepath, const FUNC &func) {
 }
 
 template<typename FUNC>
-void ForEachSignature(const string filepath, const FUNC &func) {
-    ifstream file;
-    file.open(filepath);
+void ForEachSignature(const string sigfilepath, const FUNC &func) {
+    ifstream sigfile;
+    sigfile.open(sigfilepath, ifstream::binary);
 
-    #pragma omp critical(exit)
-    if (!file.is_open()) {
+    ifstream headfile;
+    headfile.open(sigfilepath + ".head");
+
+    if (!sigfile.is_open()) {
         cerr << endl;
-        cerr << "Error opening file: " << filepath << endl;
+        cerr << "Error opening signature file: " << sigfilepath << endl;
+        #pragma omp critical(exit)
+        exit(1);
+    }
+
+    if (!headfile.is_open()) {
+        cerr << endl;
+        cerr << "Error opening header file: " << sigfilepath + ".head" << endl;
+        #pragma omp critical(exit)
         exit(1);
     }
 
     string line;
 
     // Skip meta
-    getline(file, line);
+    getline(headfile, line);
 
     Signature signature;
 
     char ch;
-    while((ch = file.get()) != EOF) {
-        if (ch == '>') {
-            getline(file, signature.id);
-            signature.value.clear();
-            for (uint i = 0; i < SIGNATURE_WIDTH / 8; i++) {
-                signature.value += (ch = file.get());
-            }
-            func(signature);
+    while (getline(headfile, line)) {
+        signature.id = line;
+        for (uint i = 0; i < SIGNATURE_WIDTH / 8; i++) {            
+            signature.value += (ch = sigfile.get());
         }
+        func(signature);
+        signature.value.clear();
     }
 }
 
@@ -199,7 +205,9 @@ int main(int argc, char * argv[]) {
             return 1;
         }
 
-        vector<string> input_files;
+        static vector<string> input_files;
+        static ofstream headfile;
+        static ofstream sigfile;
 
         // Argument parsing
         for (int i = 2; i < argc; i++) {
@@ -225,12 +233,19 @@ int main(int argc, char * argv[]) {
                 }
 
                 if (setting == "o") {
-                    OUTFILE.open(argv[++i]);
-                    if (!OUTFILE.is_open()) {
+                    sigfile.open(argv[++i]);
+                    headfile.open(argv[i] + (string)".head");
+
+                    if (!sigfile.is_open()) {
                         cerr << "Cannot open file for writing: " << argv[i] << endl;
-                        cerr << Usage(SEARCH) << endl;
                         return 1;
                     }
+
+                    if (!headfile.is_open()) {
+                        cerr << "Cannot open file for writing: " << argv[i] << ".head" << endl;
+                        return 1;
+                    }
+
                     continue;
                 }
                 
@@ -249,14 +264,14 @@ int main(int argc, char * argv[]) {
             return 1;
         }
 
-        if (!OUTFILE.is_open()) {
+        if (!headfile.is_open() || !sigfile.is_open()) {
             cerr << "Please specifiy output file with '-o'" << endl;
             cerr << Usage(SEARCH) << endl;
             return 1;
         }
 
         // Initial config metadata
-        OUTFILE << KMER_LEN << ',' << SIGNATURE_WIDTH << ',' << SIGNATURE_DENSITY << endl;
+        headfile << KMER_LEN << ',' << SIGNATURE_WIDTH << ',' << SIGNATURE_DENSITY << endl;
 
         #pragma omp parallel
         #pragma omp single
@@ -270,10 +285,11 @@ int main(int argc, char * argv[]) {
                 {
                     string signature;
                     GenerateSignature(sequence.value, signature);
+
                     #pragma omp critical(write_out)
                     {
-                        OUTFILE << '>' << sequence.id << endl;
-                        OUTFILE << signature << endl;
+                        headfile << '>' << sequence.id << endl;
+                        sigfile << signature;
                     }
                 }
             });
@@ -296,8 +312,11 @@ int main(int argc, char * argv[]) {
             return 1;
         }
 
-        string target_filepath;
-        vector<string> query_files;
+        static string target_filepath;
+        static vector<string> query_files;
+        static ifstream target_sigfile;
+        static ifstream target_headfile;
+        static ofstream resultfile;
 
         // Argument parsing
         for (int i = 2; i < argc; i++) {
@@ -318,12 +337,14 @@ int main(int argc, char * argv[]) {
                 }
 
                 if (setting == "o") {
-                    OUTFILE.open(argv[++i]);
-                    if (!OUTFILE.is_open()) {
+                    resultfile.open(argv[++i]);
+                    
+                    if (!resultfile.is_open()) {
                         cerr << "Cannot open file for writing: " << argv[i] << endl;
                         cerr << Usage(SEARCH) << endl;
                         return 1;
                     }
+
                     continue;
                 }
 
@@ -339,17 +360,26 @@ int main(int argc, char * argv[]) {
             }
         }
 
-        if (!OUTFILE.is_open()) {
-            cerr << "Please specifiy output file with '-o'" << endl;
+        if (!resultfile.is_open()) {
+            cerr << "Please specifiy output with '-o'" << endl;
             cerr << Usage(SEARCH) << endl;
             return 1;
         }
 
-        ifstream target_file;
-        target_file.open(target_filepath);
+        target_sigfile.open(target_filepath);
 
-        if (!target_file.is_open()) {
+        if (!target_sigfile.is_open()) {
             cerr << "Error opening signature file: " << target_filepath << endl;
+            cerr << Usage(SEARCH) << endl;
+            return 1;
+        }
+
+        target_sigfile.close();
+
+        target_headfile.open(target_filepath + ".head");
+
+        if (!target_headfile.is_open()) {
+            cerr << "Error opening header file: " << target_filepath + ".head" << endl;
             cerr << Usage(SEARCH) << endl;
             return 1;
         }
@@ -357,16 +387,16 @@ int main(int argc, char * argv[]) {
         string line;
 
         // Read and match signature generation metadata
-        getline(target_file, line, ',');
+        getline(target_headfile, line, ',');
         KMER_LEN = stoi(line);
 
-        getline(target_file, line, ',');
+        getline(target_headfile, line, ',');
         SIGNATURE_WIDTH = stoi(line);
 
-        getline(target_file, line);
+        getline(target_headfile, line);
         SIGNATURE_DENSITY = stoi(line);
 
-        target_file.close();
+        target_headfile.close();
 
         cerr << "Searching...";
         high_resolution_clock::time_point t1 = high_resolution_clock::now();
@@ -401,7 +431,8 @@ int main(int argc, char * argv[]) {
                             abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH;
 
                         if (normalised_dist >= DIST_THRESHOLD) {
-                            if ((!RESULT_LIMIT || these_results.size() < RESULT_LIMIT) || hamming_dist < these_results.top().hamming_dist) {
+                            if ((!RESULT_LIMIT || these_results.size() < RESULT_LIMIT)
+                                    || hamming_dist < these_results.top().hamming_dist) {
                                 these_results.emplace(
                                     target_signature.id,
                                     hamming_dist,
@@ -424,7 +455,7 @@ int main(int argc, char * argv[]) {
 
                     #pragma omp critical(write_out)
                     for(SearchResult &result : sorted_results) {
-                        OUTFILE
+                        resultfile
                             << query_signature.id
                             << '\t'
                             << result.target
