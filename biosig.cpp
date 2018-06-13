@@ -60,12 +60,14 @@ string Usage(Use use) {
             "                     DEFAULT: 19\n";
         case SEARCH:
             return
-            "Usage: ./biosig search [OPTIONS] targetSig.bsig querySig.bsig [querySig2.bsig [...]] -o outfile.tsv\n"
+            "Usage: ./biosig search [OPTIONS] targetSig.bsig querySig.bsig [querySig2.bsig [...]] -o resultfile\n"
             "OPTIONS\n"
             "    -threshold    Filter results lower than the given threshold (0-1).\n"
             "                    DEFAULT: 0.0\n"
             "    -top          Retain only the top k results.\n"
-            "                    DEFAULT: 0 (disabled)\n";
+            "                    DEFAULT: 0 (disabled)\n"
+            "    -format       Result output format. (tsv | csv | trec)\n"
+            "                    DEFAULT: tsv\n";
         default:
             return NULL;
             break;
@@ -322,6 +324,7 @@ int main(int argc, char * argv[]) {
         static ifstream target_sigfile;
         static ifstream target_headfile;
         static ofstream resultfile;
+        static string result_format = "tsv";
 
         // Argument parsing
         for (int i = 2; i < argc; i++) {
@@ -338,6 +341,18 @@ int main(int argc, char * argv[]) {
 
                 if (setting == "top") {
                     RESULT_LIMIT = stoi(argv[++i]);
+                    continue;
+                }
+
+                if (setting == "format") {
+                    string format = argv[++i];
+
+                    if (format != "tsv" && format != "csv" && format != "trec") {
+                        cerr << "Unknown format: " << format << endl;
+                        return 1;
+                    }
+
+                    result_format = format;
                     continue;
                 }
 
@@ -458,17 +473,50 @@ int main(int argc, char * argv[]) {
                         these_results.pop();
                     }
 
-                    #pragma omp critical(write_out)
-                    for(SearchResult &result : sorted_results) {
-                        resultfile
-                            << query_signature.id
-                            << '\t'
-                            << result.target
-                            << '\t'
-                            << result.hamming_dist
-                            << '\t'
-                            << result.normalised_dist
-                            << endl;
+                    // Output results based on format ...
+
+                    if (result_format == "tsv") {
+                        #pragma omp critical(write_out)
+                        for(SearchResult &result : sorted_results) {
+                            resultfile
+                                << query_signature.id
+                                << '\t'
+                                << result.target
+                                << '\t'
+                                << result.hamming_dist
+                                << '\t'
+                                << result.normalised_dist
+                                << endl;
+                        }
+                    }
+
+                    if (result_format == "csv") {
+                        #pragma omp critical(write_out)
+                        for(SearchResult &result : sorted_results) {
+                            resultfile
+                                << query_signature.id
+                                << ','
+                                << result.target
+                                << ','
+                                << result.hamming_dist
+                                << ','
+                                << result.normalised_dist
+                                << endl;
+                        }
+                    }
+
+                    if (result_format == "trec") {
+                        uint index = 1;
+                        #pragma omp critical(write_out)
+                        for(SearchResult &result : sorted_results) {
+                            resultfile
+                                << query_signature.id
+                                << " Q0 "
+                                << result.target
+                                << ' ' << index++ << ' '
+                                << result.normalised_dist
+                                << " biosig" << endl;
+                        }
                     }
                 }
             });
