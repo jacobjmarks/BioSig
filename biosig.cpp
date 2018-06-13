@@ -53,14 +53,19 @@ string Usage(Use use) {
             "Usage: ./biosig index [OPTIONS] sequenceFile [sequenceFile2 [...]] -o outfile.bsig\n"
             "OPTIONS\n"
             "    -kmerlen       Kmer length to hash.\n"
-            "                   DEFAULT: 5\n"
+            "                     DEFAULT: 5\n"
             "    -sigwidth      Signature size in bits.\n"
-            "                   DEFAULT: 1024\n"
+            "                     DEFAULT: 1024\n"
             "    -sigdensity    Signature density (1/x).\n"
-            "                   DEFAULT: 19\n";
+            "                     DEFAULT: 19\n";
         case SEARCH:
             return
-            "Usage: ./biosig search targetSig.bsig querySig.bsig [querySig2.bsig [...]] -o outfile.tsv";
+            "Usage: ./biosig search [OPTIONS] targetSig.bsig querySig.bsig [querySig2.bsig [...]] -o outfile.tsv\n"
+            "OPTIONS\n"
+            "    -threshold    Filter results lower than the given threshold (0-1).\n"
+            "                    DEFAULT: 0.0\n"
+            "    -top          Retain only the top k results.\n"
+            "                    DEFAULT: 0 (disabled)\n";
         default:
             return NULL;
             break;
