@@ -306,6 +306,15 @@ int main(int argc, char * argv[]) {
                     if (use_regex) {
                         smatch match;
                         regex_search(sequence.id, match, seqid_regex);
+                        if (match.empty()) {
+                            #pragma omp critical(exit)
+                            {
+                                cerr << "ABORTED: Regular expression resulted in empty"
+                                " match given the following sequence ID..." << endl;
+                                cerr << sequence.id << endl;
+                                exit(1);
+                            }
+                        }
                         sequence.id = string((match.size() > 1 ? match[1].str() : match[0].str()));
                     }
 
