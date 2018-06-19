@@ -295,7 +295,7 @@ int main(int argc, char * argv[]) {
 
                     #pragma omp critical(write_out)
                     {
-                        headfile << '>' << sequence.id << endl;
+                        headfile << sequence.id << endl;
                         sigfile << signature;
                     }
                 }
