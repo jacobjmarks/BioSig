@@ -13,12 +13,12 @@ Generate a signature file from the given sequence file/s.
 
 Available `OPTIONS`:
 
-| Option      | Default    | Description                                                                                             |
-| ----------- | ---------- | ------------------------------------------------------------------------------------------------------- |
-| -kmerlen    | 5          | Kmer length to hash.                                                                                    |
-| -sigwidth   | 1024       | Signature size in bits.                                                                                 |
-| -sigdensity | 19         | Signature density `1/x`.                                                                                |
-| -match      | (disabled) | Match and store sequence IDs with the given regular expression. Will prioritise first group if present. |
+| Option      | Default    | Description                                                                                                      |
+| ----------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| -kmerlen    | 5          | Kmer length to hash.                                                                                             |
+| -sigwidth   | 1024       | Signature size in bits.                                                                                          |
+| -sigdensity | 19         | Signature density `1/x`.                                                                                         |
+| -match      | (disabled) | Match and store sequence IDs with the given regular expression.<br/>Will prioritise first group `()` if present. |
 
 Indexing will result in the output of both a signature file `outfile.bsig`, as well as a header file `outfile.bsig.head`, with the following formats:
 
