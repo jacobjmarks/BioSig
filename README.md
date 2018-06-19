@@ -46,12 +46,13 @@ Search/Compare the signatures in a given signature file with one or more query s
 
 Available `OPTIONS`:
 
-| Option      | Default      | Description                                          |
-| ----------- | ------------ | ---------------------------------------------------- |
-| -threshold  | 0.0          | Filter results lower than the given threshold `0-1`. |
-| -top        | 0 (disabled) | Retain only the top k results.                       |
-| -format     | tsv          | Result output format. `(tsv \| csv \| trec)`         |
-| -unique     | (disabled)   | Do not compare signatures with identical IDs.        |
+| Option      | Default      | Description                                                                                                      |
+| ----------- | ------------ | ---------------------------------------------------------------------------------------------------------------- |
+| -threshold  | 0.0          | Filter results lower than the given threshold `0-1`.                                                             |
+| -top        | 0 (disabled) | Retain only the top k results.                                                                                   |
+| -format     | tsv          | Result output format. `(tsv \| csv \| trec)`                                                                     |
+| -unique     | (disabled)   | Do not compare signatures with identical IDs.                                                                    |
+| -match      | (disabled)   | Match and store sequence IDs with the given regular expression.<br/>Will prioritise first group `()` if present. |
 
 Results will be output as follows, depending on the format:
 
