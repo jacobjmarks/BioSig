@@ -13,11 +13,12 @@ Generate a signature file from the given sequence file/s.
 
 Available `OPTIONS`:
 
-| Option      | Default | Description              |
-| ----------- | ------- | ------------------------ |
-| -kmerlen    | 5       | Kmer length to hash.     |
-| -sigwidth   | 1024    | Signature size in bits.  |
-| -sigdensity | 19      | Signature density `1/x`. |
+| Option      | Default    | Description                                                                                             |
+| ----------- | ---------- | ------------------------------------------------------------------------------------------------------- |
+| -kmerlen    | 5          | Kmer length to hash.                                                                                    |
+| -sigwidth   | 1024       | Signature size in bits.                                                                                 |
+| -sigdensity | 19         | Signature density `1/x`.                                                                                |
+| -match      | (disabled) | Match and store sequence IDs with the given regular expression. Will prioritise first group if present. |
 
 Indexing will result in the output of both a signature file `outfile.bsig`, as well as a header file `outfile.bsig.head`, with the following formats:
 
@@ -50,7 +51,7 @@ Available `OPTIONS`:
 | -threshold  | 0.0          | Filter results lower than the given threshold `0-1`. |
 | -top        | 0 (disabled) | Retain only the top k results.                       |
 | -format     | tsv          | Result output format. `(tsv \| csv \| trec)`         |
-| -unique     |              | Do not compare signatures with identical IDs.        |
+| -unique     | (disabled)   | Do not compare signatures with identical IDs.        |
 
 Results will be output as follows, depending on the format:
 
