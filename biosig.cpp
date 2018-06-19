@@ -324,6 +324,8 @@ int main(int argc, char * argv[]) {
         static ifstream target_sigfile;
         static ifstream target_headfile;
         static ofstream resultfile;
+
+        static bool unique = false;
         static string result_format = "tsv";
 
         // Argument parsing
@@ -353,6 +355,11 @@ int main(int argc, char * argv[]) {
                     }
 
                     result_format = format;
+                    continue;
+                }
+
+                if (setting == "unique") {
+                    unique = true;
                     continue;
                 }
 
@@ -435,6 +442,8 @@ int main(int argc, char * argv[]) {
                         these_results(result_comparator);
 
                     ForEachSignature(target_filepath, [&](const Signature &target_signature) {
+                        if (unique && query_signature.id == target_signature.id) return;
+
                         uint hamming_dist = 0;
 
                         for (uint i = 0; i < SIGNATURE_WIDTH / 8; i++) {
