@@ -7,6 +7,7 @@
 #include <omp.h>
 #include <algorithm>
 #include <queue>
+#include <regex>
 
 // DEFAULTS -----------------------
 static uint KMER_LEN = 5;
@@ -216,6 +217,9 @@ int main(int argc, char * argv[]) {
         static ofstream headfile;
         static ofstream sigfile;
 
+        static bool use_regex = false;
+        static regex seqid_regex;
+
         // Argument parsing
         for (int i = 2; i < argc; i++) {
             string arg = string(argv[i]);
@@ -236,6 +240,12 @@ int main(int argc, char * argv[]) {
 
                 if (setting == "sigdensity") {
                     SIGNATURE_DENSITY = stoi(argv[++i]);
+                    continue;
+                }
+
+                if (setting == "match") {
+                    use_regex = true;
+                    seqid_regex.assign(argv[++i]);
                     continue;
                 }
 
@@ -287,11 +297,17 @@ int main(int argc, char * argv[]) {
             cerr << "\tIndexing...";
             high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-            ForEachSequence(filepath, [](const Sequence &sequence){
+            ForEachSequence(filepath, [](Sequence &sequence){
                 #pragma omp task
                 {
                     string signature;
                     GenerateSignature(sequence.value, signature);
+
+                    if (use_regex) {
+                        smatch match;
+                        regex_search(sequence.id, match, seqid_regex);
+                        sequence.id = string((match.size() > 1 ? match[1].str() : match[0].str()));
+                    }
 
                     #pragma omp critical(write_out)
                     {
