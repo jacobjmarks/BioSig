@@ -309,8 +309,7 @@ int main(int argc, char * argv[]) {
                         if (match.empty()) {
                             #pragma omp critical(exit)
                             {
-                                cerr << "ABORTED: Regular expression resulted in empty"
-                                " match given the following sequence ID..." << endl;
+                                cerr << "ABORTED: Regular expression resulted in empty match given the following sequence ID..." << endl;
                                 cerr << sequence.id << endl;
                                 exit(1);
                             }
@@ -353,6 +352,9 @@ int main(int argc, char * argv[]) {
         static bool unique = false;
         static string result_format = "tsv";
 
+        static bool use_regex = false;
+        static regex seqid_regex;
+
         // Argument parsing
         for (int i = 2; i < argc; i++) {
             string arg = string(argv[i]);
@@ -385,6 +387,12 @@ int main(int argc, char * argv[]) {
 
                 if (setting == "unique") {
                     unique = true;
+                    continue;
+                }
+
+                if (setting == "match") {
+                    use_regex = true;
+                    seqid_regex.assign(argv[++i]);
                     continue;
                 }
 
@@ -460,13 +468,41 @@ int main(int argc, char * argv[]) {
         #pragma omp parallel
         #pragma omp single
         for (string query_filepath : query_files) {
-            ForEachSignature(query_filepath, [&](const Signature &query_signature) {
+            ForEachSignature(query_filepath, [&](Signature &query_signature) {
+                if (use_regex) {
+                    smatch match;
+                    regex_search(query_signature.id, match, seqid_regex);
+                    if (match.empty()) {
+                        #pragma omp critical(exit)
+                        {
+                            cerr << "ABORTED: Regular expression resulted in empty match given the following sequence ID..." << endl;
+                            cerr << query_signature.id << endl;
+                            exit(1);
+                        }
+                    }
+                    query_signature.id = string((match.size() > 1 ? match[1].str() : match[0].str()));
+                }
+
                 #pragma omp task
                 {
                     priority_queue<SearchResult, vector<SearchResult>, decltype(result_comparator)>
                         these_results(result_comparator);
 
-                    ForEachSignature(target_filepath, [&](const Signature &target_signature) {
+                    ForEachSignature(target_filepath, [&](Signature &target_signature) {
+                        if (use_regex) {
+                            smatch match;
+                            regex_search(target_signature.id, match, seqid_regex);
+                            if (match.empty()) {
+                                #pragma omp critical(exit)
+                                {
+                                    cerr << "ABORTED: Regular expression resulted in empty match given the following sequence ID..." << endl;
+                                    cerr << target_signature.id << endl;
+                                    exit(1);
+                                }
+                            }
+                            target_signature.id = string((match.size() > 1 ? match[1].str() : match[0].str()));
+                        }
+
                         if (unique && query_signature.id == target_signature.id) return;
 
                         uint hamming_dist = 0;
