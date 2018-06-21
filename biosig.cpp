@@ -469,17 +469,53 @@ int main(int argc, char * argv[]) {
 
         string line;
 
-        // Read and match signature generation metadata
+        // Read and match target metadata
         getline(target_headfile, line, ',');
         KMER_LEN = stoi(line);
 
         getline(target_headfile, line, ',');
         SIGNATURE_WIDTH = stoi(line);
 
-        getline(target_headfile, line);
+        getline(target_headfile, line, ',');
         SIGNATURE_DENSITY = stoi(line);
 
         target_headfile.close();
+
+        bool metadata_discrepancy = false;
+
+        // Check for metadata discrepancies
+        for (string query_filepath : query_files) {
+            ifstream query_headfile;
+            query_headfile.open(query_filepath + ".head");
+            if (!query_headfile.is_open()) {
+                cerr << "Error opening header file: " << query_filepath + ".head" << endl;
+                return 1;
+            }
+
+            getline(query_headfile, line, ',');
+            uint kmer_len = stoi(line);
+
+            getline(query_headfile, line, ',');
+            uint signature_width = stoi(line);
+
+            getline(query_headfile, line, ',');
+            uint signature_density = stoi(line);
+
+            if (kmer_len != KMER_LEN || signature_width != SIGNATURE_WIDTH || signature_density != SIGNATURE_DENSITY) {
+                metadata_discrepancy = true;
+                cerr << "WARNING: Discrepancy in signature generation metadata..." << endl;
+                cerr << "Query file: " << query_filepath << endl;
+                cerr << "PARAMETER         QUERY\tTARGET" << endl;
+                cerr << "Kmer Length       " << kmer_len << '\t' << KMER_LEN << endl;
+                cerr << "Signature Width   " << signature_width << '\t' << SIGNATURE_WIDTH << endl;
+                cerr << "Signature Density " << signature_density << '\t' << SIGNATURE_DENSITY << endl << endl;
+            }
+        }
+
+        if (metadata_discrepancy) {
+            cerr << "ABORTING" << endl;
+            return 1;
+        }
 
         cerr << "Searching...";
         high_resolution_clock::time_point t1 = high_resolution_clock::now();
