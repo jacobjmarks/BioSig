@@ -287,17 +287,36 @@ int main(int argc, char * argv[]) {
             return 1;
         }
 
-        // Initial config metadata
-        headfile << KMER_LEN << ',' << SIGNATURE_WIDTH << ',' << SIGNATURE_DENSITY << endl;
+        // Prepass; Get sequence count
+        cerr << "Prepass...";
+
+        static unsigned long long int sequence_count = 0;
+
+        for (string filepath : input_files) {
+            ForEachSequence(filepath, [](Sequence &sequence) {
+                sequence_count++;
+            });
+        }
+
+        cerr << "DONE" << endl;
+
+        // Write initial metadata
+        headfile << KMER_LEN << ',' << SIGNATURE_WIDTH << ',' << SIGNATURE_DENSITY << ',' << sequence_count << endl;
+
+        cerr << "Indexing " << input_files.size() << " files with " << sequence_count << " sequences..." << endl;
+
+        high_resolution_clock::time_point t1 = high_resolution_clock::now();
+
+        static unsigned long long int sequence_index = 0;
+        static uint percent_complete = 0;
+
+        cerr << "0%";
 
         #pragma omp parallel
         #pragma omp single
         for (string filepath : input_files) {
-            cerr << filepath << endl;
-            cerr << "\tIndexing...";
-            high_resolution_clock::time_point t1 = high_resolution_clock::now();
-
             ForEachSequence(filepath, [](Sequence &sequence){
+                // Delegate signature generation
                 #pragma omp task
                 {
                     string signature;
@@ -322,15 +341,19 @@ int main(int argc, char * argv[]) {
                         headfile << sequence.id << endl;
                         sigfile << signature;
                     }
+
+                    #pragma omp critical(update_progress)
+                    if (int((float)sequence_index++ / sequence_count * 100.0) != percent_complete) {
+                        cerr << '\r' << ++percent_complete << '%';
+                    }
                 }
             });
-
-            #pragma omp taskwait
-
-            high_resolution_clock::time_point t2 = high_resolution_clock::now();
-            duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
-            cerr << time_span.count() << 's' << endl;
         }
+        cerr << "\r100%" << endl;
+
+        high_resolution_clock::time_point t2 = high_resolution_clock::now();
+        duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
+        cerr << time_span.count() << 's' << endl;
 
         return 0;
     }
