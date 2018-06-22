@@ -33,7 +33,7 @@ This file contains the signatures that were generated from the sequences.
 
 This file contains the IDs of the sequences that were indexed. The first line contains metadata regarding the indexing parameters.
 ```
-[kmer length],[signature width],[signature density]
+[kmer length],[signature width],[signature density],[sequence count]
 [sequence id A]
 [sequence id B]
 [...]
