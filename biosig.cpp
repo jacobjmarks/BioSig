@@ -349,6 +349,7 @@ int main(int argc, char * argv[]) {
                 }
             });
         }
+
         cerr << "\r100%" << endl;
 
         high_resolution_clock::time_point t2 = high_resolution_clock::now();
@@ -479,8 +480,12 @@ int main(int argc, char * argv[]) {
         getline(target_headfile, line, ',');
         SIGNATURE_DENSITY = stoi(line);
 
+        getline(target_headfile, line);
+        static unsigned long long int target_signature_count = stoull(line);
+
         target_headfile.close();
 
+        static unsigned long long int query_signature_count = 0;
         bool metadata_discrepancy = false;
 
         // Check for metadata discrepancies
@@ -510,6 +515,10 @@ int main(int argc, char * argv[]) {
                 cerr << "Signature Width   " << signature_width << '\t' << SIGNATURE_WIDTH << endl;
                 cerr << "Signature Density " << signature_density << '\t' << SIGNATURE_DENSITY << endl << endl;
             }
+
+            // Sum query signatures
+            getline(query_headfile, line);
+            query_signature_count += stoull(line);
         }
 
         if (metadata_discrepancy) {
@@ -517,7 +526,14 @@ int main(int argc, char * argv[]) {
             return 1;
         }
 
-        cerr << "Searching...";
+        static unsigned long long int total_operation_count = query_signature_count * target_signature_count;
+        static unsigned long long int operation_index = 0;
+        static uint percent_complete = 0;
+
+        cerr << "Comparing " << query_signature_count << " queries against " << target_signature_count << " targets ";
+        cerr << "(" << total_operation_count << " operations)..." << endl;
+        cerr << "0%";
+
         high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
         auto result_comparator = [](const SearchResult &a, const SearchResult &b) {
@@ -562,7 +578,14 @@ int main(int argc, char * argv[]) {
                             target_signature.id = string((match.size() > 1 ? match[1].str() : match[0].str()));
                         }
 
-                        if (unique && query_signature.id == target_signature.id) return;
+                        if (unique && query_signature.id == target_signature.id) {
+                            #pragma omp critical(update_progress)
+                            if (int((float)operation_index++ / total_operation_count * 100.0) != percent_complete) {
+                                cerr << '\r' << ++percent_complete << '%';
+                                if (percent_complete >= 99) cerr << " (waiting on I/O)";
+                            }
+                            return;
+                        }
 
                         uint hamming_dist = 0;
 
@@ -592,6 +615,12 @@ int main(int argc, char * argv[]) {
                                     these_results.pop();
                                 }
                             }
+                        }
+
+                        #pragma omp critical(update_progress)
+                        if (int((float)operation_index++ / total_operation_count * 100.0) != percent_complete) {
+                            cerr << '\r' << ++percent_complete << '%';
+                            if (percent_complete >= 99) cerr << " (waiting on I/O)";
                         }
                     });
 
@@ -650,6 +679,8 @@ int main(int argc, char * argv[]) {
                 }
             });
         }
+
+        cerr << "\r100%                 " << endl;
 
         high_resolution_clock::time_point t2 = high_resolution_clock::now();
         duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
