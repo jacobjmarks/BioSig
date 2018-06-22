@@ -6,8 +6,8 @@
 #include <random>
 #include <omp.h>
 #include <algorithm>
-#include <queue>
 #include <regex>
+#include <set>
 
 // DEFAULTS -----------------------
 static uint KMER_LEN = 5;
@@ -560,8 +560,7 @@ int main(int argc, char * argv[]) {
 
                 #pragma omp task
                 {
-                    priority_queue<SearchResult, vector<SearchResult>, decltype(result_comparator)>
-                        these_results(result_comparator);
+                    set<SearchResult, decltype(result_comparator)> these_results(result_comparator);
 
                     ForEachSignature(target_filepath, [&](Signature &target_signature) {
                         if (use_regex) {
@@ -582,7 +581,6 @@ int main(int argc, char * argv[]) {
                             #pragma omp critical(update_progress)
                             if (int((float)operation_index++ / total_operation_count * 100.0) != percent_complete) {
                                 cerr << '\r' << ++percent_complete << '%';
-                                if (percent_complete >= 99) cerr << " (waiting on I/O)";
                             }
                             return;
                         }
@@ -603,8 +601,12 @@ int main(int argc, char * argv[]) {
                             abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH;
 
                         if (normalised_dist >= DIST_THRESHOLD) {
-                            if ((!RESULT_LIMIT || these_results.size() < RESULT_LIMIT)
-                                    || hamming_dist < these_results.top().hamming_dist) {
+                            auto largest_result = these_results.begin();
+                            
+                            bool need_result = !RESULT_LIMIT || these_results.size() < RESULT_LIMIT;
+                            bool larger_result = hamming_dist > (*largest_result).hamming_dist;
+
+                            if (need_result || larger_result) {
                                 these_results.emplace(
                                     target_signature.id,
                                     hamming_dist,
@@ -612,7 +614,7 @@ int main(int argc, char * argv[]) {
                                 );
                                 
                                 if (RESULT_LIMIT && these_results.size() > RESULT_LIMIT) {
-                                    these_results.pop();
+                                    these_results.erase(--these_results.end());
                                 }
                             }
                         }
@@ -620,22 +622,14 @@ int main(int argc, char * argv[]) {
                         #pragma omp critical(update_progress)
                         if (int((float)operation_index++ / total_operation_count * 100.0) != percent_complete) {
                             cerr << '\r' << ++percent_complete << '%';
-                            if (percent_complete >= 99) cerr << " (waiting on I/O)";
                         }
                     });
-
-                    deque<SearchResult> sorted_results;
-
-                    while(!these_results.empty()) {
-                        sorted_results.push_front(these_results.top());
-                        these_results.pop();
-                    }
 
                     // Output results based on format ...
 
                     if (result_format == "tsv") {
                         #pragma omp critical(write_out)
-                        for(SearchResult &result : sorted_results) {
+                        for(const SearchResult &result : these_results) {
                             resultfile
                                 << query_signature.id
                                 << '\t'
@@ -650,7 +644,7 @@ int main(int argc, char * argv[]) {
 
                     if (result_format == "csv") {
                         #pragma omp critical(write_out)
-                        for(SearchResult &result : sorted_results) {
+                        for(const SearchResult &result : these_results) {
                             resultfile
                                 << query_signature.id
                                 << ','
@@ -666,7 +660,7 @@ int main(int argc, char * argv[]) {
                     if (result_format == "trec") {
                         uint index = 1;
                         #pragma omp critical(write_out)
-                        for(SearchResult &result : sorted_results) {
+                        for(const SearchResult &result : these_results) {
                             resultfile
                                 << query_signature.id
                                 << " Q0 "
@@ -680,7 +674,7 @@ int main(int argc, char * argv[]) {
             });
         }
 
-        cerr << "\r100%                 " << endl;
+        cerr << "\r100%" << endl;
 
         high_resolution_clock::time_point t2 = high_resolution_clock::now();
         duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
