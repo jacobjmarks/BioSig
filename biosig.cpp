@@ -58,7 +58,9 @@ string Usage(Use use) {
             "    -sigwidth      Signature size in bits.\n"
             "                     DEFAULT: 1024\n"
             "    -sigdensity    Signature density (1/x).\n"
-            "                     DEFAULT: 19\n";
+            "                     DEFAULT: 19\n"
+            "    -match         Match and store sequence IDs with the given regular expression.\n"
+            "                   Will prioritise first group () if present.\n";
         case SEARCH:
             return
             "Usage: ./biosig search [OPTIONS] targetSig.bsig querySig.bsig [querySig2.bsig [...]] -o resultfile\n"
@@ -68,7 +70,10 @@ string Usage(Use use) {
             "    -top          Retain only the top k results.\n"
             "                    DEFAULT: 0 (disabled)\n"
             "    -format       Result output format. (tsv | csv | trec)\n"
-            "                    DEFAULT: tsv\n";
+            "                    DEFAULT: tsv\n"
+            "    -unique       Do not compare signatures with identical IDs.\n"
+            "    -match        Match and store sequence IDs with the given regular expression.\n"
+            "                  Will prioritise first group () if present.\n";
         default:
             return NULL;
             break;
