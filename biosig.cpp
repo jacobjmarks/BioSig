@@ -565,7 +565,7 @@ int main(int argc, char * argv[]) {
 
                 #pragma omp task
                 {
-                    set<SearchResult, decltype(result_comparator)> these_results(result_comparator);
+                    multiset<SearchResult, decltype(result_comparator)> these_results(result_comparator);
 
                     ForEachSignature(target_filepath, [&](Signature &target_signature) {
                         if (use_regex) {
@@ -609,7 +609,7 @@ int main(int argc, char * argv[]) {
                             auto largest_result = these_results.begin();
                             
                             bool need_result = !RESULT_LIMIT || these_results.size() < RESULT_LIMIT;
-                            bool larger_result = hamming_dist > (*largest_result).hamming_dist;
+                            bool larger_result = normalised_dist >= (*largest_result).normalised_dist;
 
                             if (need_result || larger_result) {
                                 these_results.emplace(
