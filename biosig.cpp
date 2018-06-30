@@ -27,13 +27,11 @@ typedef struct {
 
 struct SearchResult {
     string target;
-    uint hamming_dist;
-    double normalised_dist;
+    double similarity;
 
-    SearchResult(string target, uint hamming_dist, double normalised_dist) {
+    SearchResult(string target, double similarity) {
         SearchResult::target = target;
-        SearchResult::hamming_dist = hamming_dist;
-        SearchResult::normalised_dist = normalised_dist;
+        SearchResult::similarity = similarity;
     }
 };
 
@@ -542,7 +540,7 @@ int main(int argc, char * argv[]) {
         high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
         auto result_comparator = [](const SearchResult &a, const SearchResult &b) {
-            return a.hamming_dist < b.hamming_dist;
+            return a.similarity > b.similarity;
         };
 
         #pragma omp parallel
@@ -602,20 +600,18 @@ int main(int argc, char * argv[]) {
                             }
                         }
 
-                        double normalised_dist =
+                        double similarity =
                             abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH;
 
-                        if (normalised_dist >= DIST_THRESHOLD) {
+                        if (similarity >= DIST_THRESHOLD) {
                             auto largest_result = these_results.begin();
                             
                             bool need_result = !RESULT_LIMIT || these_results.size() < RESULT_LIMIT;
-                            bool larger_result = normalised_dist >= (*largest_result).normalised_dist;
 
-                            if (need_result || larger_result) {
+                            if (need_result || similarity >= (*largest_result).similarity) {
                                 these_results.emplace(
                                     target_signature.id,
-                                    hamming_dist,
-                                    normalised_dist
+                                    similarity
                                 );
                                 
                                 if (RESULT_LIMIT && these_results.size() > RESULT_LIMIT) {
@@ -640,9 +636,7 @@ int main(int argc, char * argv[]) {
                                 << '\t'
                                 << result.target
                                 << '\t'
-                                << result.hamming_dist
-                                << '\t'
-                                << result.normalised_dist
+                                << result.similarity
                                 << endl;
                         }
                     }
@@ -655,9 +649,7 @@ int main(int argc, char * argv[]) {
                                 << ','
                                 << result.target
                                 << ','
-                                << result.hamming_dist
-                                << ','
-                                << result.normalised_dist
+                                << result.similarity
                                 << endl;
                         }
                     }
@@ -671,7 +663,7 @@ int main(int argc, char * argv[]) {
                                 << " Q0 "
                                 << result.target
                                 << ' ' << index++ << ' '
-                                << result.normalised_dist
+                                << result.similarity
                                 << " biosig" << endl;
                         }
                     }
