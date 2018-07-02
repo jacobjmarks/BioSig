@@ -13,7 +13,7 @@
 static uint KMER_LEN = 5;
 static uint SIGNATURE_WIDTH = 1024;
 static uint SIGNATURE_DENSITY = 19;
-static double DIST_THRESHOLD = 0.0;
+static double SIM_THRESHOLD = 0.0;
 static uint RESULT_LIMIT = 0;
 // --------------------------------
 
@@ -63,7 +63,7 @@ string Usage(Use use) {
             return
             "Usage: ./biosig search [OPTIONS] targetSig.bsig querySig.bsig [querySig2.bsig [...]] -o resultfile\n"
             "OPTIONS\n"
-            "    -threshold    Filter results lower than the given threshold (0-1).\n"
+            "    -threshold    Filter results lower than the given similarity threshold (0-1).\n"
             "                    DEFAULT: 0.0\n"
             "    -top          Retain only the top k results.\n"
             "                    DEFAULT: 0 (disabled)\n"
@@ -391,7 +391,7 @@ int main(int argc, char * argv[]) {
                 string setting = arg.substr(1, arg.length());
 
                 if (setting == "threshold") {
-                    DIST_THRESHOLD = stod(argv[++i]);
+                    SIM_THRESHOLD = stod(argv[++i]);
                     continue;
                 }
 
@@ -603,7 +603,7 @@ int main(int argc, char * argv[]) {
                         double similarity =
                             abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH;
 
-                        if (similarity >= DIST_THRESHOLD) {
+                        if (similarity >= SIM_THRESHOLD) {
                             auto largest_result = these_results.begin();
                             
                             bool need_result = !RESULT_LIMIT || these_results.size() < RESULT_LIMIT;
