@@ -48,7 +48,7 @@ Available `OPTIONS`:
 
 | Option      | Default      | Description                                                                                                      |
 | ----------- | ------------ | ---------------------------------------------------------------------------------------------------------------- |
-| -threshold  | 0.0          | Filter results lower than the given threshold `0-1`.                                                             |
+| -threshold  | 0.0          | Filter results lower than the given similarity threshold `0-1`.                                                             |
 | -top        | 0 (disabled) | Retain only the top k results.                                                                                   |
 | -format     | tsv          | Result output format. `(tsv \| csv \| trec)`                                                                     |
 | -unique     | (disabled)   | Do not compare signatures with identical IDs.                                                                    |
@@ -58,15 +58,15 @@ Results will be output as follows, depending on the format:
 
 **tsv** (tab-separated values)
 ```
-[query]    [target]    [hamming distance]    [normalised distance]
+[query]    [target]    [similarity]
 ```
 
 **csv** (comma-separated values)
 ```
-[query],[target],[hamming distance],[normalised distance]
+[query],[target],[similarity]
 ```
 
 **trec** (Text REtrieval Conference)
 ```
-[query] Q0 [target] [rank] [normalised distance] biosig
+[query] Q0 [target] [rank] [similarity] biosig
 ```
