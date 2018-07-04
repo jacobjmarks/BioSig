@@ -600,8 +600,7 @@ int main(int argc, char * argv[]) {
                             }
                         }
 
-                        double similarity =
-                            abs((double)hamming_dist - SIGNATURE_WIDTH) / SIGNATURE_WIDTH;
+                        double similarity = 1 - ((double)hamming_dist / SIGNATURE_WIDTH);
 
                         if (similarity >= SIM_THRESHOLD) {
                             auto largest_result = these_results.begin();
