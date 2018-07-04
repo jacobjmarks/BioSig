@@ -115,12 +115,14 @@ void GenerateSignature(const string &sequence, string &result) {
 
     result.reserve(SIGNATURE_WIDTH / 8);
 
-    char bit = 0;
+    auto sig_iter = signature.begin();
+
     for (uint i = 0; i < SIGNATURE_WIDTH / 8; i++) {
-        for (uint j = 0; j < 8; j++) {
-            bit ^= (-(signature[(i * 8) + j] > 0 ? 1 : 0) ^ bit) & (1UL << (-j + 7));
+        char byte = 0;
+        for (int j = 7; j >= 0; j--) {
+            byte |= (*sig_iter++ > 0 ? 1 : 0) << j;
         }
-        result += bit;
+        result += byte;
     }
 }
 
