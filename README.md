@@ -19,6 +19,7 @@ Available `OPTIONS`:
 | -sigwidth   | 1024        | Signature size in bits.                                                                                          |
 | -sigdensity | 0.047619048 | Signature density `0-1`.                                                                                         |
 | -match      | (disabled)  | Match and store sequence IDs with the given regular expression.<br/>Will prioritise first group `()` if present. |
+| -q          | (disbaled)  | Quiet operation; Suppress output.                                                                                |
 
 Indexing will result in the output of both a signature file `outfile.bsig`, as well as a header file `outfile.bsig.head`, with the following formats:
 
@@ -53,6 +54,7 @@ Available `OPTIONS`:
 | -format     | tsv          | Result output format. `(tsv \| csv \| trec)`                                                                     |
 | -unique     | (disabled)   | Do not compare signatures with identical IDs.                                                                    |
 | -match      | (disabled)   | Match and store sequence IDs with the given regular expression.<br/>Will prioritise first group `()` if present. |
+| -q          | (disbaled)   | Quiet operation; Suppress output.                                                                                |
 
 Results will be output as follows, depending on the format:
 
