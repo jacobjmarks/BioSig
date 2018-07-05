@@ -59,7 +59,8 @@ string Usage(Use use) {
             "    -sigdensity    Signature density (0-1).\n"
             "                     DEFAULT: 0.047619048\n"
             "    -match         Match and store sequence IDs with the given regular expression.\n"
-            "                   Will prioritise first group () if present.\n";
+            "                   Will prioritise first group () if present.\n"
+            "    -q             Quiet operation; Suppress output.\n";
         case SEARCH:
             return
             "Usage: ./biosig search [OPTIONS] targetSig.bsig querySig.bsig [querySig2.bsig [...]] -o resultfile\n"
@@ -72,7 +73,8 @@ string Usage(Use use) {
             "                    DEFAULT: tsv\n"
             "    -unique       Do not compare signatures with identical IDs.\n"
             "    -match        Match and store sequence IDs with the given regular expression.\n"
-            "                  Will prioritise first group () if present.\n";
+            "                  Will prioritise first group () if present.\n"
+            "    -q            Quiet operation; Suppress output.\n";
         default:
             return NULL;
             break;
@@ -255,6 +257,11 @@ int main(int argc, char * argv[]) {
                     continue;
                 }
 
+                if (setting == "q") {
+                    cout.setstate(ios_base::failbit);
+                    cerr.setstate(ios_base::failbit);
+                }
+
                 if (setting == "o") {
                     sigfile.open(argv[++i]);
                     headfile.open(argv[i] + (string)".head");
@@ -425,6 +432,11 @@ int main(int argc, char * argv[]) {
                     use_regex = true;
                     seqid_regex.assign(argv[++i]);
                     continue;
+                }
+
+                if (setting == "q") {
+                    cout.setstate(ios_base::failbit);
+                    cerr.setstate(ios_base::failbit);
                 }
 
                 if (setting == "o") {
