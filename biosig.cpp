@@ -8,11 +8,12 @@
 #include <algorithm>
 #include <regex>
 #include <set>
+#include <iomanip>
 
 // DEFAULTS -----------------------
 static uint KMER_LEN = 5;
 static uint SIGNATURE_WIDTH = 1024;
-static uint SIGNATURE_DENSITY = 19;
+static double SIGNATURE_DENSITY = 0.047619048;
 static double SIM_THRESHOLD = 0.0;
 static uint RESULT_LIMIT = 0;
 // --------------------------------
@@ -55,8 +56,8 @@ string Usage(Use use) {
             "                     DEFAULT: 5\n"
             "    -sigwidth      Signature size in bits.\n"
             "                     DEFAULT: 1024\n"
-            "    -sigdensity    Signature density (1/x).\n"
-            "                     DEFAULT: 19\n"
+            "    -sigdensity    Signature density (0-1).\n"
+            "                     DEFAULT: 0.047619048\n"
             "    -match         Match and store sequence IDs with the given regular expression.\n"
             "                   Will prioritise first group () if present.\n";
         case SEARCH:
@@ -89,7 +90,7 @@ void GenerateSignature(const string &sequence, string &result) {
         random_generator.seed(seed);
 
         uint pos = 0;
-        uint set_limit = SIGNATURE_WIDTH / SIGNATURE_DENSITY / 2;
+        uint set_limit = SIGNATURE_WIDTH * SIGNATURE_DENSITY / 2;
         vector<bool> bits_set(SIGNATURE_WIDTH, false);
 
         for (uint set = 0; set < set_limit;) {
@@ -244,7 +245,7 @@ int main(int argc, char * argv[]) {
                 }
 
                 if (setting == "sigdensity") {
-                    SIGNATURE_DENSITY = stoi(argv[++i]);
+                    SIGNATURE_DENSITY = stod(argv[++i]);
                     continue;
                 }
 
@@ -306,6 +307,7 @@ int main(int argc, char * argv[]) {
         cerr << "DONE" << endl;
 
         // Write initial metadata
+        headfile << setprecision(10);
         headfile << KMER_LEN << ',' << SIGNATURE_WIDTH << ',' << SIGNATURE_DENSITY << ',' << sequence_count << endl;
 
         cerr << "Indexing " << input_files.size() << " files with " << sequence_count << " sequences..." << endl;
@@ -509,7 +511,7 @@ int main(int argc, char * argv[]) {
             uint signature_width = stoi(line);
 
             getline(query_headfile, line, ',');
-            uint signature_density = stoi(line);
+            uint signature_density = stod(line);
 
             if (kmer_len != KMER_LEN || signature_width != SIGNATURE_WIDTH || signature_density != SIGNATURE_DENSITY) {
                 metadata_discrepancy = true;
